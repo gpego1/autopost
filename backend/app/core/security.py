@@ -5,15 +5,16 @@ from typing import Optional
 
 import httpx
 from cryptography.fernet import Fernet
-from jose import JWTError, jwt
+from jose import JWTError, jwk, jwt
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-_jwks_cache: dict = {}
-_jwks_cache_time: float = 0.0
-_JWKS_TTL = 300.0  # refresh public keys every 5 minutes
+# kid → jose Key object, refreshed every 5 minutes
+_rsa_keys: dict = {}
+_rsa_keys_time: float = 0.0
+_JWKS_TTL = 300.0
 
 
 def _get_fernet() -> Fernet:
@@ -37,12 +38,12 @@ def decrypt_token(encrypted: bytes) -> str:
     return f.decrypt(encrypted).decode("utf-8")
 
 
-async def _get_jwks() -> dict:
-    """Fetch Supabase JWKS (RS256 public keys) with a 5-minute in-memory cache."""
-    global _jwks_cache, _jwks_cache_time
+async def _refresh_rsa_keys() -> dict:
+    """Fetch Supabase JWKS and build an explicit kid → jose Key map."""
+    global _rsa_keys, _rsa_keys_time
     now = time.monotonic()
-    if _jwks_cache and (now - _jwks_cache_time) < _JWKS_TTL:
-        return _jwks_cache
+    if _rsa_keys and (now - _rsa_keys_time) < _JWKS_TTL:
+        return _rsa_keys
 
     url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
     async with httpx.AsyncClient(timeout=10) as client:
@@ -50,36 +51,63 @@ async def _get_jwks() -> dict:
         resp.raise_for_status()
         data = resp.json()
 
-    _jwks_cache = data
-    _jwks_cache_time = now
-    logger.info("JWKS refreshed from %s (%d keys)", url, len(data.get("keys", [])))
-    return _jwks_cache
+    new_keys: dict = {}
+    for key_data in data.get("keys", []):
+        try:
+            kid = key_data.get("kid", "__default__")
+            new_keys[kid] = jwk.construct(key_data, algorithm="RS256")
+            logger.info("JWKS key loaded: kid=%s", kid)
+        except Exception as exc:
+            logger.warning("Failed to load JWKS key kid=%s: %s", key_data.get("kid"), exc)
+
+    _rsa_keys = new_keys
+    _rsa_keys_time = now
+    logger.info("JWKS refreshed — %d key(s) available", len(new_keys))
+    return new_keys
 
 
 async def verify_supabase_jwt(token: str) -> Optional[dict]:
     """
-    Verify a Supabase JWT and return its payload.
-
-    Modern Supabase projects sign with RS256 (asymmetric); the public keys are
-    fetched from the JWKS endpoint. Older/custom projects use HS256 with the
-    JWT secret. Both are tried in order.
+    Verify a Supabase JWT.
+    - RS256 path: fetches public keys from Supabase JWKS, matches by kid.
+    - HS256 path: falls back to SUPABASE_JWT_SECRET (legacy / custom projects).
+    Logs the algorithm at INFO so it is visible in Vercel production logs.
     """
-    # RS256 path — modern Supabase (post-2024 projects)
     try:
-        jwks = await _get_jwks()
-        payload = jwt.decode(
-            token,
-            jwks,
-            algorithms=["RS256"],
-            options={"verify_aud": False},
-        )
-        return payload
-    except JWTError:
-        pass  # fall through to HS256
+        header = jwt.get_unverified_header(token)
+        alg = header.get("alg", "unknown")
+        kid = header.get("kid")
+        logger.info("JWT incoming: alg=%s kid=%s", alg, kid)
     except Exception as exc:
-        logger.warning("JWKS fetch/RS256 error: %s", exc)
+        logger.warning("Cannot parse JWT header: %s", exc)
+        return None
 
-    # HS256 fallback — legacy Supabase or custom JWT secret
+    if alg == "RS256":
+        try:
+            keys = await _refresh_rsa_keys()
+            rsa_key = keys.get(kid) if kid else None
+            if rsa_key is None and keys:
+                # No kid or no match — try any available key
+                rsa_key = next(iter(keys.values()))
+            if rsa_key is None:
+                logger.warning("RS256: no JWKS key available (JWKS empty or fetch failed)")
+                return None
+
+            payload = jwt.decode(
+                token,
+                rsa_key,
+                algorithms=["RS256"],
+                options={"verify_aud": False},
+            )
+            return payload
+        except JWTError as exc:
+            logger.warning("RS256 JWT verification failed: %s", exc)
+            return None
+        except Exception as exc:
+            logger.warning("RS256 verification error: %s", exc)
+            return None
+
+    # HS256 path (older / custom Supabase projects)
     try:
         secret = settings.supabase_jwt_secret.strip()
         payload = jwt.decode(
