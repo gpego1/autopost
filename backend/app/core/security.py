@@ -40,10 +40,11 @@ def verify_supabase_jwt(token: str) -> Optional[dict]:
     Verify a Supabase-issued JWT and return its payload.
     Returns None if the token is invalid or expired.
     """
+    secret = settings.supabase_jwt_secret.strip()
     try:
         payload = jwt.decode(
             token,
-            settings.supabase_jwt_secret,
+            secret,
             algorithms=["HS256"],
             options={"verify_aud": False},
         )

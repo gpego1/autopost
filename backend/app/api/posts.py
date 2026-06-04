@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/posts", tags=["posts"])
 
 
-@router.get("/", response_model=list[PostResponse])
+@router.get("", response_model=list[PostResponse])
 async def list_posts(
     status_filter: Optional[PostStatus] = Query(None, alias="status"),
     limit: int = Query(50, ge=1, le=200),
@@ -33,7 +33,7 @@ async def list_posts(
     return list(result.scalars().all())
 
 
-@router.post("/", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
 async def create_post(
     payload: PostCreate,
     user_id: UUID = Depends(get_current_user_id),

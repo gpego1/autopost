@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
-@router.get("/", response_model=list[PublishJobResponse])
+@router.get("", response_model=list[PublishJobResponse])
 async def list_jobs(
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),

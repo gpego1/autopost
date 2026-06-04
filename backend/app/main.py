@@ -45,6 +45,7 @@ app = FastAPI(
     description="Social media scheduling platform API",
     version="0.1.0",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 # CORS — allow the frontend origin (and localhost for development)

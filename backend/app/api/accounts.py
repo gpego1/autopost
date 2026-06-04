@@ -41,7 +41,7 @@ def _validate_redirect_uri(redirect_uri: str) -> None:
         )
 
 
-@router.get("/", response_model=list[SocialAccountResponse])
+@router.get("", response_model=list[SocialAccountResponse])
 async def list_accounts(
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
