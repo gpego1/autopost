@@ -22,13 +22,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// Response interceptor: handle 401 by redirecting to login
+// Response interceptor: on 401 try to refresh the session first;
+// only sign out and redirect if there is truly no valid session.
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
-      await supabase.auth.signOut()
-      window.location.href = '/login'
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        await supabase.auth.signOut()
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

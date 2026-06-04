@@ -36,7 +36,7 @@ async def get_current_user_id(
     Raises HTTP 401 if the token is missing, invalid, or expired.
     """
     token = credentials.credentials
-    payload = verify_supabase_jwt(token)
+    payload = await verify_supabase_jwt(token)
 
     if payload is None:
         raise HTTPException(
