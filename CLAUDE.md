@@ -8,9 +8,11 @@ AutoPost is a social media scheduling platform. Users connect Facebook, Instagra
 
 ## Architecture
 
-**Backend** (`backend/`) — FastAPI + async SQLAlchemy + Celery/Redis + PostgreSQL (via Supabase)
+**Backend** (`backend/`) — FastAPI + async SQLAlchemy + PostgreSQL (via Supabase), deployed as a Vercel Serverless Function via `api/index.py` (Mangum ASGI adapter)
 
-**Frontend** (`frontend/`) — React 18 + Vite + TanStack Query + Tailwind CSS
+**Frontend** (`frontend/`) — React 18 + Vite + TanStack Query + Tailwind CSS, deployed as Vercel Static Site
+
+**Scheduled publishing** — Vercel Cron Job calls `POST /api/jobs/process-due` every minute; the endpoint queries for `scheduled` posts with `scheduled_at <= now()` and publishes them. No Redis or Celery required.
 
 ### Auth flow
 
@@ -19,10 +21,11 @@ Supabase handles all user auth (sign-up, login, session management). The fronten
 ### Publish pipeline
 
 1. User creates a post via `POST /api/posts/` → status `draft` or `scheduled`
-2. User triggers scheduling via `POST /api/posts/{id}/schedule` → creates `PublishJob` rows (one per platform) + enqueues a Celery task with `eta=scheduled_at`
-3. `publish_post_task` (`backend/app/workers/publish_task.py`) runs at the scheduled time: fetches the post, decrypts the OAuth token, calls the platform service, updates job status
-4. Post status transitions: `draft` → `scheduled` → `publishing` → `done` / `failed`
-5. Failed jobs retry up to 3 times with exponential backoff (60s, 120s, 240s)
+2. User triggers scheduling via `POST /api/posts/{id}/schedule` → creates `PublishJob` rows (one per platform), sets `scheduled_at`, status becomes `scheduled`
+3. Vercel Cron fires `POST /api/jobs/process-due` every minute → calls `run_due_posts()` → finds all posts where `status = scheduled AND scheduled_at <= now`
+4. `publish_post()` in `backend/app/workers/publish_task.py` decrypts the OAuth token, calls the platform service, updates job + post status
+5. Post status transitions: `draft` → `scheduled` → `publishing` → `done` / `failed`
+6. Failed jobs are retried up to 3 times on subsequent cron ticks (status = `retrying`)
 
 ### OAuth token storage
 
@@ -56,12 +59,6 @@ alembic revision --autogenerate -m "description"
 
 # Start API server (hot-reload)
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Start Celery worker
-celery -A app.workers.celery_app worker --loglevel=info
-
-# Start Celery Beat (if scheduling is needed)
-celery -A app.workers.celery_app beat --loglevel=info
 ```
 
 ### Frontend
@@ -84,7 +81,9 @@ npm run build
 
 ## Environment Variables
 
-**Backend** (`backend/.env`): `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_JWT_SECRET`, `DATABASE_URL` (asyncpg format: `postgresql+asyncpg://...`), `REDIS_URL`, `ENCRYPT_KEY`, `META_APP_ID`, `META_APP_SECRET`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`
+**Backend** (`backend/.env`): `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_JWT_SECRET`, `DATABASE_URL` (asyncpg format: `postgresql+asyncpg://...`), `ENCRYPT_KEY`, `CRON_SECRET`, `META_APP_ID`, `META_APP_SECRET`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`
+
+**Vercel env vars** (set in Vercel dashboard, mirror of backend .env for production): same keys as above. Vercel automatically injects `CRON_SECRET` into cron request headers — set the same value in both places.
 
 **Frontend** (`frontend/.env`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_URL`
 

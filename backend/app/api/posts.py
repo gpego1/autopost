@@ -10,7 +10,6 @@ from app.core.deps import get_current_user_id, get_db
 from app.models.post import Post
 from app.models.publish_job import PublishJob
 from app.schemas.post import PostCreate, PostResponse, PostStatus, PostUpdate, SchedulePostRequest
-from app.workers.publish_task import publish_post_task
 
 logger = logging.getLogger(__name__)
 
@@ -147,11 +146,6 @@ async def schedule_post(
     await db.flush()
     await db.refresh(post)
 
-    # Enqueue Celery task (eta = scheduled_at for time-based execution)
-    publish_post_task.apply_async(
-        args=[str(post.id)],
-        eta=payload.scheduled_at,
-    )
     logger.info("Scheduled post %s for %s", post.id, payload.scheduled_at)
 
     return post

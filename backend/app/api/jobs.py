@@ -1,14 +1,16 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.deps import get_current_user_id, get_db
 from app.models.post import Post
 from app.models.publish_job import PublishJob
 from app.schemas.job import PublishJobResponse
+from app.workers.publish_task import run_due_posts
 
 logger = logging.getLogger(__name__)
 
@@ -49,3 +51,18 @@ async def get_job(
             detail="Publish job not found",
         )
     return job
+
+
+@router.post("/process-due", include_in_schema=False)
+async def process_due_posts(
+    authorization: str | None = Header(None),
+) -> dict:
+    """Vercel Cron endpoint: publish all posts whose scheduled_at <= now.
+    Vercel sends Authorization: Bearer <CRON_SECRET> automatically.
+    Set CRON_SECRET in both Vercel env vars and backend .env.
+    """
+    if settings.cron_secret and authorization != f"Bearer {settings.cron_secret}":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    logger.info("Cron triggered: processing due posts")
+    return await run_due_posts()

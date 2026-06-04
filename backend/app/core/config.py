@@ -1,5 +1,6 @@
-from pydantic_settings import BaseSettings
 from typing import Optional
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -7,8 +8,10 @@ class Settings(BaseSettings):
     supabase_service_key: str
     supabase_jwt_secret: str
     database_url: str
-    redis_url: str = "redis://localhost:6379/0"
     encrypt_key: str
+    # Secret Vercel sends in Authorization header for cron requests.
+    # Leave empty in development to skip the check.
+    cron_secret: str = ""
     meta_app_id: str = ""
     meta_app_secret: str = ""
     linkedin_client_id: str = ""
