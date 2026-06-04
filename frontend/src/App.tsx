@@ -28,6 +28,7 @@ export default function App() {
           >
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/composer" element={<Composer />} />
+            <Route path="/composer/:id" element={<Composer />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/accounts" element={<Accounts />} />
             <Route path="/history" element={<History />} />
