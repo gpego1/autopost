@@ -58,10 +58,10 @@ async def process_due_posts(
     authorization: str | None = Header(None),
 ) -> dict:
     """Vercel Cron endpoint: publish all posts whose scheduled_at <= now.
-    Vercel sends Authorization: Bearer <CRON_SECRET> automatically.
-    Set CRON_SECRET in both Vercel env vars and backend .env.
+    Always requires Authorization: Bearer <CRON_SECRET>.
+    Set CRON_SECRET in Vercel env vars — Vercel injects it into cron requests automatically.
     """
-    if settings.cron_secret and authorization != f"Bearer {settings.cron_secret}":
+    if authorization != f"Bearer {settings.cron_secret}":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
     logger.info("Cron triggered: processing due posts")

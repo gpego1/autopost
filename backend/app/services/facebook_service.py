@@ -1,6 +1,6 @@
 import asyncio
+import json
 import logging
-from typing import Optional
 
 import httpx
 
@@ -21,45 +21,27 @@ class FacebookService:
     ) -> dict:
         """
         Publish a post to a Facebook Page.
-
-        For posts with media, first uploads the photo/video, then creates
-        a post linking to it. For text-only posts, creates a feed post directly.
-
+        For posts with media, uploads photos first then attaches them to a feed post.
         Returns the Graph API response dict containing the post ID.
         """
         async with httpx.AsyncClient(timeout=60) as client:
             if media_urls:
-                # Upload all photos first and collect IDs
                 media_ids = []
                 for url in media_urls:
-                    photo_resp = await self._upload_photo(
-                        client, access_token, page_id, url
-                    )
-                    media_ids.append({"media_fbid": photo_resp["id"]})
-
-                if len(media_ids) == 1:
-                    # Single photo post
-                    data = {
-                        "message": content,
-                        "access_token": access_token,
-                        "attached_media": str(media_ids),
-                    }
-                else:
-                    # Multi-photo post
-                    data = {
-                        "message": content,
-                        "access_token": access_token,
-                        "attached_media": str(media_ids),
-                    }
+                    photo = await self._upload_photo(client, access_token, page_id, url)
+                    media_ids.append({"media_fbid": photo["id"]})
 
                 resp = await self._post_with_retry(
                     client,
                     f"{GRAPH_API_BASE}/{page_id}/feed",
-                    data={"message": content, "access_token": access_token,
-                          "attached_media": str(media_ids)},
+                    data={
+                        "message": content,
+                        "access_token": access_token,
+                        # Graph API requires a JSON-encoded array, not Python repr
+                        "attached_media": json.dumps(media_ids),
+                    },
                 )
             else:
-                # Text-only post
                 resp = await self._post_with_retry(
                     client,
                     f"{GRAPH_API_BASE}/{page_id}/feed",
@@ -76,17 +58,12 @@ class FacebookService:
         page_id: str,
         photo_url: str,
     ) -> dict:
-        """Upload a photo to the page's photo library (unpublished)."""
-        resp = await self._post_with_retry(
+        """Upload a photo to the page library (unpublished) and return its id."""
+        return await self._post_with_retry(
             client,
             f"{GRAPH_API_BASE}/{page_id}/photos",
-            data={
-                "url": photo_url,
-                "published": "false",
-                "access_token": access_token,
-            },
+            data={"url": photo_url, "published": "false", "access_token": access_token},
         )
-        return resp
 
     async def _post_with_retry(
         self,
@@ -95,7 +72,7 @@ class FacebookService:
         data: dict,
         max_retries: int = 3,
     ) -> dict:
-        """POST with exponential backoff retry for rate limits (code 17/32)."""
+        """POST with exponential backoff on Facebook rate-limit error codes."""
         for attempt in range(max_retries):
             response = await client.post(url, data=data)
 
@@ -106,15 +83,10 @@ class FacebookService:
             error = body.get("error", {})
             error_code = error.get("code", 0)
 
-            # Facebook rate limit error codes
             if error_code in (17, 32, 613) and attempt < max_retries - 1:
-                wait_time = 2 ** attempt * 5  # 5, 10, 20 seconds
-                logger.warning(
-                    "Facebook rate limit hit (code %s), retrying in %ss",
-                    error_code,
-                    wait_time,
-                )
-                await asyncio.sleep(wait_time)
+                wait = 2 ** attempt * 5
+                logger.warning("Facebook rate limit (code %s), retrying in %ss", error_code, wait)
+                await asyncio.sleep(wait)
                 continue
 
             raise ValueError(
@@ -123,16 +95,8 @@ class FacebookService:
 
         raise ValueError("Max retries exceeded for Facebook API call")
 
-    async def refresh_token(
-        self,
-        access_token: str,
-        app_id: str,
-        app_secret: str,
-    ) -> str:
-        """
-        Exchange a short-lived user token for a long-lived token.
-        Returns the new access token string.
-        """
+    async def refresh_token(self, access_token: str, app_id: str, app_secret: str) -> str:
+        """Exchange a short-lived token for a long-lived one."""
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(
                 f"{GRAPH_API_BASE}/oauth/access_token",

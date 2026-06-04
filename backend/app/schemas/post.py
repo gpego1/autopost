@@ -31,7 +31,6 @@ class PostUpdate(BaseModel):
     platforms: Optional[list[str]] = None
     status: Optional[PostStatus] = None
     scheduled_at: Optional[datetime] = None
-    error_log: Optional[str] = None
 
     model_config = {"str_strip_whitespace": True}
 

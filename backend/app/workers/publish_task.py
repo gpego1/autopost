@@ -12,7 +12,8 @@ MAX_RETRIES = 3
 
 async def run_due_posts() -> dict:
     """Find every scheduled post whose scheduled_at <= now and publish it.
-    Called by the Vercel Cron endpoint POST /api/jobs/process-due.
+    Uses SELECT FOR UPDATE SKIP LOCKED so concurrent cron invocations never
+    pick up the same post twice.
     """
     from app.database import AsyncSessionLocal
     from app.models.post import Post
@@ -20,27 +21,37 @@ async def run_due_posts() -> dict:
     async with AsyncSessionLocal() as db:
         now = datetime.now(tz=timezone.utc)
         result = await db.execute(
-            select(Post).where(
-                Post.status == "scheduled",
-                Post.scheduled_at <= now,
-            )
+            select(Post)
+            .where(Post.status == "scheduled", Post.scheduled_at <= now)
+            .with_for_update(skip_locked=True)
         )
         due = list(result.scalars().all())
 
+        # Claim all due posts atomically before any publishing starts
+        for post in due:
+            post.status = "publishing"
+
+        post_ids = [str(post.id) for post in due]
+        await db.commit()
+
     results = []
-    for post in due:
+    for post_id in post_ids:
         try:
-            outcome = await publish_post(str(post.id))
-            results.append({"post_id": str(post.id), "ok": True, **outcome})
+            outcome = await _publish_by_id(post_id)
+            results.append({"post_id": post_id, "ok": True, **outcome})
         except Exception as exc:
-            logger.error("Cron: failed to publish post %s: %s", post.id, exc)
-            results.append({"post_id": str(post.id), "ok": False, "error": str(exc)})
+            logger.error("Cron: failed to publish post %s: %s", post_id, exc)
+            results.append({"post_id": post_id, "ok": False, "error": str(exc)})
 
     return {"processed": len(results), "results": results}
 
 
 async def publish_post(post_id: str) -> dict:
-    """Publish a single post to all its target platforms."""
+    """Publish a single post (called directly, not via cron)."""
+    return await _publish_by_id(post_id)
+
+
+async def _publish_by_id(post_id: str) -> dict:
     from app.database import AsyncSessionLocal
 
     async with AsyncSessionLocal() as db:

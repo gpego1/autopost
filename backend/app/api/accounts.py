@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlparse
 from uuid import UUID
 
 import httpx
@@ -24,6 +25,22 @@ LINKEDIN_TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
 LINKEDIN_ME_URL = "https://api.linkedin.com/v2/userinfo"
 
 
+def _validate_redirect_uri(redirect_uri: str) -> None:
+    """Reject any redirect_uri whose origin is not in the allowlist."""
+    parsed = urlparse(redirect_uri)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    allowed = {
+        settings.frontend_url.rstrip("/"),
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    }
+    if origin not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="redirect_uri not allowed",
+        )
+
+
 @router.get("/", response_model=list[SocialAccountResponse])
 async def list_accounts(
     user_id: UUID = Depends(get_current_user_id),
@@ -44,6 +61,7 @@ async def get_meta_oauth_url(
     _user_id: UUID = Depends(get_current_user_id),
 ) -> dict:
     """Return the Meta OAuth authorization URL."""
+    _validate_redirect_uri(redirect_uri)
     scope = "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish"
     url = (
         f"https://www.facebook.com/v19.0/dialog/oauth"
@@ -61,6 +79,7 @@ async def get_linkedin_oauth_url(
     _user_id: UUID = Depends(get_current_user_id),
 ) -> dict:
     """Return the LinkedIn OAuth authorization URL."""
+    _validate_redirect_uri(redirect_uri)
     scope = "r_liteprofile+r_emailaddress+w_member_social"
     url = (
         f"https://www.linkedin.com/oauth/v2/authorization"
@@ -82,12 +101,10 @@ async def meta_oauth_callback(
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> SocialAccount:
-    """
-    Handle Meta (Facebook/Instagram) OAuth callback.
-    Exchange authorization code for access token and save the account.
-    """
+    """Handle Meta OAuth callback: exchange code for token and save account."""
+    _validate_redirect_uri(payload.redirect_uri)
+
     async with httpx.AsyncClient(timeout=30) as client:
-        # Exchange code for token
         token_resp = await client.get(
             META_TOKEN_URL,
             params={
@@ -104,9 +121,8 @@ async def meta_oauth_callback(
             )
         token_data = token_resp.json()
         access_token = token_data.get("access_token")
-        expires_in = token_data.get("expires_in")  # seconds
+        expires_in = token_data.get("expires_in")
 
-        # Fetch user info
         me_resp = await client.get(
             META_ME_URL,
             params={"access_token": access_token, "fields": "id,name"},
@@ -125,7 +141,6 @@ async def meta_oauth_callback(
             tz=timezone.utc,
         )
 
-    # Check if account already exists
     existing = await db.execute(
         select(SocialAccount).where(
             SocialAccount.user_id == user_id,
@@ -164,10 +179,9 @@ async def linkedin_oauth_callback(
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> SocialAccount:
-    """
-    Handle LinkedIn OAuth callback.
-    Exchange authorization code for access token and save the account.
-    """
+    """Handle LinkedIn OAuth callback: exchange code for token and save account."""
+    _validate_redirect_uri(payload.redirect_uri)
+
     async with httpx.AsyncClient(timeout=30) as client:
         token_resp = await client.post(
             LINKEDIN_TOKEN_URL,
@@ -190,7 +204,6 @@ async def linkedin_oauth_callback(
         refresh_token = token_data.get("refresh_token")
         expires_in = token_data.get("expires_in")
 
-        # Fetch user info via OpenID Connect endpoint
         me_resp = await client.get(
             LINKEDIN_ME_URL,
             headers={"Authorization": f"Bearer {access_token}"},
