@@ -65,4 +65,8 @@ async def process_due_posts(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
     logger.info("Cron triggered: processing due posts")
-    return await run_due_posts()
+    try:
+        return await run_due_posts()
+    except Exception as exc:
+        logger.exception("Cron run_due_posts failed: %s", exc)
+        raise

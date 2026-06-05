@@ -127,7 +127,24 @@ async def meta_oauth_callback(
             )
         token_data = token_resp.json()
         user_access_token = token_data.get("access_token")
-        logger.info("Meta token exchange OK, fetching pages")
+        logger.info("Meta token exchange OK, extending to long-lived token")
+
+        # Exchange short-lived user token for long-lived (~60 days) so that
+        # page tokens returned by /me/accounts are also permanent (no expiration).
+        ll_resp = await client.get(
+            META_TOKEN_URL,
+            params={
+                "grant_type": "fb_exchange_token",
+                "client_id": settings.meta_app_id,
+                "client_secret": settings.meta_app_secret,
+                "fb_exchange_token": user_access_token,
+            },
+        )
+        if ll_resp.status_code == 200:
+            user_access_token = ll_resp.json().get("access_token", user_access_token)
+            logger.info("Meta user token extended to long-lived successfully")
+        else:
+            logger.warning("Failed to extend user token, proceeding with short-lived: %s", ll_resp.text[:200])
 
         pages_resp = await client.get(
             META_ACCOUNTS_URL,
