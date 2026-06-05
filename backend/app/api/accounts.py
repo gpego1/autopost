@@ -62,7 +62,7 @@ async def get_meta_oauth_url(
 ) -> dict:
     """Return the Meta OAuth authorization URL."""
     _validate_redirect_uri(redirect_uri)
-    scope = "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish"
+    scope = "pages_manage_posts,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish"
     url = (
         f"https://www.facebook.com/v19.0/dialog/oauth"
         f"?client_id={settings.meta_app_id}"
