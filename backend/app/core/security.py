@@ -9,15 +9,17 @@ from typing import Optional
 import httpx
 from cryptography.exceptions import InvalidSignature
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicNumbers, SECP256R1, SECP384R1
 from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
+from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from cryptography.hazmat.primitives.hashes import SHA256
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# kid → RSAPublicKey; refreshed every 5 minutes
+# kid → public key (RSAPublicKey or EllipticCurvePublicKey); refreshed every 5 minutes
 _rsa_keys: dict = {}
 _rsa_keys_time: float = 0.0
 _JWKS_TTL = 300.0
@@ -66,7 +68,7 @@ def _jwt_parts(token: str):
 # ── JWKS / RSA ────────────────────────────────────────────────────────────────
 
 async def _refresh_rsa_keys() -> dict:
-    """Fetch Supabase JWKS and build a kid → RSAPublicKey map."""
+    """Fetch Supabase JWKS and build a kid → public key map (RSA and EC)."""
     global _rsa_keys, _rsa_keys_time
     now = time.monotonic()
     if _rsa_keys and (now - _rsa_keys_time) < _JWKS_TTL:
@@ -82,25 +84,48 @@ async def _refresh_rsa_keys() -> dict:
     new_keys: dict = {}
     for key_data in data.get("keys", []):
         try:
-            if key_data.get("kty") != "RSA":
-                continue
             kid = key_data.get("kid", "__default__")
-            n = int.from_bytes(_b64url_decode(key_data["n"]), "big")
-            e = int.from_bytes(_b64url_decode(key_data["e"]), "big")
-            new_keys[kid] = RSAPublicNumbers(e=e, n=n).public_key()
-            logger.info("RSA public key loaded: kid=%s", kid)
+            kty = key_data.get("kty")
+
+            if kty == "RSA":
+                n = int.from_bytes(_b64url_decode(key_data["n"]), "big")
+                e = int.from_bytes(_b64url_decode(key_data["e"]), "big")
+                new_keys[kid] = RSAPublicNumbers(e=e, n=n).public_key()
+                logger.info("RSA public key loaded: kid=%s", kid)
+
+            elif kty == "EC":
+                crv = key_data.get("crv", "P-256")
+                x = int.from_bytes(_b64url_decode(key_data["x"]), "big")
+                y = int.from_bytes(_b64url_decode(key_data["y"]), "big")
+                curve = SECP384R1() if crv == "P-384" else SECP256R1()
+                new_keys[kid] = EllipticCurvePublicNumbers(x=x, y=y, curve=curve).public_key()
+                logger.info("EC public key loaded: kid=%s crv=%s", kid, crv)
+
+            else:
+                logger.info("Skipping unsupported JWKS key type: kty=%s kid=%s", kty, kid)
+
         except Exception as exc:
             logger.warning("Skipping bad JWKS key (kid=%s): %s", key_data.get("kid"), exc)
 
     _rsa_keys = new_keys
     _rsa_keys_time = now
-    logger.info("JWKS refreshed — %d RSA key(s) loaded", len(new_keys))
+    logger.info("JWKS refreshed — %d key(s) loaded", len(new_keys))
     return new_keys
 
 
 def _verify_rs256(signing_input: bytes, signature: bytes, rsa_key) -> None:
     """Raise InvalidSignature if the RS256 signature is wrong."""
     rsa_key.verify(signature, signing_input, PKCS1v15(), SHA256())
+
+
+def _verify_es256(signing_input: bytes, signature: bytes, ec_key) -> None:
+    """Raise InvalidSignature if the ES256 signature is wrong.
+    JWT packs ES256 signatures as raw 64-byte R||S (not DER); convert before verifying."""
+    if len(signature) != 64:
+        raise ValueError(f"ES256 signature must be 64 bytes, got {len(signature)}")
+    r = int.from_bytes(signature[:32], "big")
+    s = int.from_bytes(signature[32:], "big")
+    ec_key.verify(encode_dss_signature(r, s), signing_input, ECDSA(SHA256()))
 
 
 def _verify_hs256(signing_input: bytes, signature: bytes, secret: str) -> None:
@@ -116,10 +141,8 @@ async def verify_supabase_jwt(token: str) -> Optional[dict]:
     """
     Verify a Supabase JWT using the cryptography library directly.
 
-    RS256 path: fetches public keys from Supabase JWKS endpoint and verifies
-    with PKCS1v15 + SHA-256. Matched by kid header; falls back to any key if
-    no kid is present.
-
+    ES256/RS256 paths: fetch public keys from Supabase JWKS endpoint, select
+    by kid header, verify with the matching algorithm.
     HS256 path: verifies with SUPABASE_JWT_SECRET (legacy / custom projects).
 
     Logs alg and kid at INFO level for production diagnostics.
@@ -140,23 +163,26 @@ async def verify_supabase_jwt(token: str) -> Optional[dict]:
         logger.warning("JWT expired")
         return None
 
-    if alg == "RS256":
+    if alg in ("RS256", "ES256"):
         try:
             keys = await _refresh_rsa_keys()
-            rsa_key = keys.get(kid) if kid else None
-            if rsa_key is None and keys:
-                rsa_key = next(iter(keys.values()))
-            if rsa_key is None:
-                logger.warning("RS256: JWKS returned no usable RSA keys")
+            key = keys.get(kid) if kid else None
+            if key is None and keys:
+                key = next(iter(keys.values()))
+            if key is None:
+                logger.warning("%s: JWKS returned no usable keys", alg)
                 return None
-            _verify_rs256(signing_input, signature, rsa_key)
-            logger.info("RS256 verification OK for sub=%s", payload.get("sub"))
+            if alg == "RS256":
+                _verify_rs256(signing_input, signature, key)
+            else:
+                _verify_es256(signing_input, signature, key)
+            logger.info("%s verification OK for sub=%s", alg, payload.get("sub"))
             return payload
         except InvalidSignature:
-            logger.warning("RS256 signature invalid (wrong key or tampered token)")
+            logger.warning("%s signature invalid (wrong key or tampered token)", alg)
             return None
         except Exception as exc:
-            logger.warning("RS256 verification error: %s", exc)
+            logger.warning("%s verification error: %s", alg, exc)
             return None
 
     if alg == "HS256":
