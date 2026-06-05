@@ -27,8 +27,8 @@ export const getLinkedInOAuthUrl = async (redirectUri: string): Promise<OAuthUrl
 export const connectMetaCallback = async (
   code: string,
   redirectUri: string
-): Promise<SocialAccount> => {
-  const { data } = await api.post<SocialAccount>('/accounts/connect/meta/callback', {
+): Promise<SocialAccount[]> => {
+  const { data } = await api.post<SocialAccount[]>('/accounts/connect/meta/callback', {
     code,
     redirect_uri: redirectUri,
   })

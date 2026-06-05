@@ -91,17 +91,22 @@ async def get_linkedin_oauth_url(
     return {"authorization_url": url}
 
 
+META_ACCOUNTS_URL = "https://graph.facebook.com/v19.0/me/accounts"
+
+
 @router.post(
     "/connect/meta/callback",
-    response_model=SocialAccountResponse,
+    response_model=list[SocialAccountResponse],
     status_code=status.HTTP_201_CREATED,
 )
 async def meta_oauth_callback(
     payload: OAuthCallbackRequest,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
-) -> SocialAccount:
-    """Handle Meta OAuth callback: exchange code for token and save account."""
+) -> list[SocialAccount]:
+    """Handle Meta OAuth callback: exchange code for token, fetch managed Pages
+    and save each Page as a separate SocialAccount with its own Page access token.
+    """
     _validate_redirect_uri(payload.redirect_uri)
 
     async with httpx.AsyncClient(timeout=30) as client:
@@ -120,53 +125,60 @@ async def meta_oauth_callback(
                 detail=f"Failed to exchange Meta code: {token_resp.text}",
             )
         token_data = token_resp.json()
-        access_token = token_data.get("access_token")
-        expires_in = token_data.get("expires_in")
+        user_access_token = token_data.get("access_token")
 
-        me_resp = await client.get(
-            META_ME_URL,
-            params={"access_token": access_token, "fields": "id,name"},
+        pages_resp = await client.get(
+            META_ACCOUNTS_URL,
+            params={"access_token": user_access_token, "fields": "id,name,access_token"},
         )
-        if me_resp.status_code != 200:
+        if pages_resp.status_code != 200:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to fetch Meta user info",
+                detail=f"Failed to fetch Facebook Pages: {pages_resp.text}",
             )
-        me_data = me_resp.json()
+        pages_data = pages_resp.json().get("data", [])
 
-    token_expires_at: Optional[datetime] = None
-    if expires_in:
-        token_expires_at = datetime.fromtimestamp(
-            datetime.now(tz=timezone.utc).timestamp() + int(expires_in),
-            tz=timezone.utc,
+    if not pages_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nenhuma Página do Facebook encontrada. Certifique-se de ter pelo menos uma Página e ser administrador dela.",
         )
 
-    existing = await db.execute(
-        select(SocialAccount).where(
-            SocialAccount.user_id == user_id,
-            SocialAccount.platform == "facebook",
-            SocialAccount.platform_user_id == me_data["id"],
-        )
-    )
-    account = existing.scalar_one_or_none()
+    saved_accounts: list[SocialAccount] = []
+    for page in pages_data:
+        page_id = page["id"]
+        page_name = page.get("name", "Facebook Page")
+        page_token = page.get("access_token", user_access_token)
 
-    if account is None:
-        account = SocialAccount(
-            user_id=user_id,
-            platform="facebook",
-            account_name=me_data.get("name", "Unknown"),
-            platform_user_id=me_data["id"],
+        existing = await db.execute(
+            select(SocialAccount).where(
+                SocialAccount.user_id == user_id,
+                SocialAccount.platform == "facebook",
+                SocialAccount.platform_user_id == page_id,
+            )
         )
-        db.add(account)
+        account = existing.scalar_one_or_none()
 
-    account.access_token = encrypt_token(access_token)
-    account.token_expires_at = token_expires_at
-    account.is_active = True
+        if account is None:
+            account = SocialAccount(
+                user_id=user_id,
+                platform="facebook",
+                account_name=page_name,
+                platform_user_id=page_id,
+            )
+            db.add(account)
+
+        account.access_token = encrypt_token(page_token)
+        account.token_expires_at = None  # Page tokens are long-lived
+        account.is_active = True
+        saved_accounts.append(account)
 
     await db.flush()
-    await db.refresh(account)
-    logger.info("Connected Meta account %s for user %s", me_data["id"], user_id)
-    return account
+    for account in saved_accounts:
+        await db.refresh(account)
+
+    logger.info("Connected %d Facebook Page(s) for user %s", len(saved_accounts), user_id)
+    return saved_accounts
 
 
 @router.post(
