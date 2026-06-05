@@ -8,8 +8,10 @@ import { Accounts } from '@/pages/Accounts'
 import { Calendar } from '@/pages/Calendar'
 import { Composer } from '@/pages/Composer'
 import { Dashboard } from '@/pages/Dashboard'
+import { DataDeletion } from '@/pages/DataDeletion'
 import { History } from '@/pages/History'
 import { Login } from '@/pages/Login'
+import { PrivacyPolicy } from '@/pages/PrivacyPolicy'
 import { Register } from '@/pages/Register'
 
 export default function App() {
@@ -19,6 +21,8 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/data-deletion" element={<DataDeletion />} />
           <Route
             element={
               <ProtectedRoute>
