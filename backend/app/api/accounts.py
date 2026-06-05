@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from uuid import UUID
 
 import httpx
@@ -66,7 +66,7 @@ async def get_meta_oauth_url(
     url = (
         f"https://www.facebook.com/v19.0/dialog/oauth"
         f"?client_id={settings.meta_app_id}"
-        f"&redirect_uri={redirect_uri}"
+        f"&redirect_uri={quote(redirect_uri, safe='')}"
         f"&scope={scope}"
         f"&response_type=code"
     )
@@ -80,12 +80,12 @@ async def get_linkedin_oauth_url(
 ) -> dict:
     """Return the LinkedIn OAuth authorization URL."""
     _validate_redirect_uri(redirect_uri)
-    scope = "r_liteprofile+r_emailaddress+w_member_social"
+    scope = "openid+profile+email+w_member_social"
     url = (
         f"https://www.linkedin.com/oauth/v2/authorization"
         f"?response_type=code"
         f"&client_id={settings.linkedin_client_id}"
-        f"&redirect_uri={redirect_uri}"
+        f"&redirect_uri={quote(redirect_uri, safe='')}"
         f"&scope={scope}"
     )
     return {"authorization_url": url}

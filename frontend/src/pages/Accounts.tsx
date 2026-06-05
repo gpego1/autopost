@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   AlertCircle,
@@ -29,19 +29,24 @@ export function Accounts() {
   const queryClient = useQueryClient()
   const [callbackStatus, setCallbackStatus] = useState<CallbackStatus>(null)
   const [callbackLoading, setCallbackLoading] = useState(false)
+  const callbackFiredRef = useRef(false)
 
   useEffect(() => {
+    if (callbackFiredRef.current) return
+
     const code = searchParams.get('code')
     const oauthError = searchParams.get('error')
     const platform = sessionStorage.getItem('oauth_platform') as Platform | null
 
     if (oauthError) {
+      callbackFiredRef.current = true
       setCallbackStatus({ type: 'error', message: 'Autorização negada pelo usuário.' })
       setSearchParams({})
       return
     }
 
     if (code && platform) {
+      callbackFiredRef.current = true
       sessionStorage.removeItem('oauth_platform')
       setCallbackLoading(true)
       setSearchParams({})
@@ -57,10 +62,15 @@ export function Accounts() {
           const name = platform === 'linkedin' ? 'LinkedIn' : 'Meta (Facebook/Instagram)'
           setCallbackStatus({ type: 'success', message: `Conta ${name} conectada com sucesso!` })
         } catch (e: any) {
-          setCallbackStatus({
-            type: 'error',
-            message: e?.response?.data?.detail ?? 'Erro ao conectar conta.',
-          })
+          const status = e?.response?.status
+          const detail = e?.response?.data?.detail
+          let message = 'Erro ao conectar conta.'
+          if (status === 401) {
+            message = 'Sessão expirada. Faça login novamente e tente conectar a conta.'
+          } else if (typeof detail === 'string') {
+            message = detail
+          }
+          setCallbackStatus({ type: 'error', message })
         } finally {
           setCallbackLoading(false)
         }
