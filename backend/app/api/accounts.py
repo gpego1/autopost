@@ -120,17 +120,20 @@ async def meta_oauth_callback(
             },
         )
         if token_resp.status_code != 200:
+            logger.error("Meta token exchange failed: %s", token_resp.text)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Failed to exchange Meta code: {token_resp.text}",
             )
         token_data = token_resp.json()
         user_access_token = token_data.get("access_token")
+        logger.info("Meta token exchange OK, fetching pages")
 
         pages_resp = await client.get(
             META_ACCOUNTS_URL,
             params={"access_token": user_access_token, "fields": "id,name,access_token"},
         )
+        logger.info("Meta /me/accounts status=%s body=%s", pages_resp.status_code, pages_resp.text[:300])
         if pages_resp.status_code != 200:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
