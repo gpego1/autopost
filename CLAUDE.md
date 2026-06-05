@@ -4,39 +4,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AutoPost is a social media scheduling platform. Users connect Facebook, Instagram, and LinkedIn accounts via OAuth, compose posts, schedule them, and a Celery worker publishes them at the scheduled time.
+AutoPost is a social media scheduling platform. Users connect Facebook, Instagram, and LinkedIn accounts via OAuth, compose posts, schedule them, and a Vercel Cron Job publishes them at the scheduled time.
 
 ## Architecture
 
-**Backend** (`backend/`) — FastAPI + async SQLAlchemy + PostgreSQL (via Supabase), deployed as a Vercel Serverless Function via `api/index.py` (Mangum ASGI adapter)
+**Backend** (`backend/`) — FastAPI + async SQLAlchemy + PostgreSQL (via Supabase), deployed as a Vercel Serverless Function via `api/index.py` (Mangum ASGI adapter). The entry point adds `backend/` to `sys.path` so `app.main:app` is importable.
 
-**Frontend** (`frontend/`) — React 18 + Vite + TanStack Query + Tailwind CSS, deployed as Vercel Static Site
+**Frontend** (`frontend/`) — React 18 + Vite + TanStack Query + Tailwind CSS, deployed as a Vercel static site. React Router v6 with `<ProtectedRoute>` gating authenticated pages.
 
-**Scheduled publishing** — Vercel Cron Job calls `POST /api/jobs/process-due` every minute; the endpoint queries for `scheduled` posts with `scheduled_at <= now()` and publishes them. No Redis or Celery required.
+**Scheduled publishing** — Vercel Cron Job calls `POST /api/jobs/process-due` every minute. The `crons` array in `vercel.json` is currently empty — add the cron entry there for production. The endpoint uses `SELECT FOR UPDATE SKIP LOCKED` so concurrent invocations never pick up the same post twice.
+
+**Database** — `NullPool` is intentional in `backend/app/database.py`; serverless functions must not maintain a persistent connection pool.
 
 ### Auth flow
 
-Supabase handles all user auth (sign-up, login, session management). The frontend attaches the Supabase JWT as a Bearer token on every API request (`frontend/src/services/api.ts`). The backend verifies the JWT using `SUPABASE_JWT_SECRET` (`backend/app/core/security.py:verify_supabase_jwt`) and extracts the user UUID from the `sub` claim.
+Supabase handles user auth. The frontend attaches the Supabase JWT as a Bearer token on every request (`frontend/src/services/api.ts`). The backend verifies the JWT in `backend/app/core/security.py:verify_supabase_jwt` — RS256 path fetches JWKS from Supabase (cached 5 min), HS256 path uses `SUPABASE_JWT_SECRET` as fallback. User UUID is extracted from the `sub` claim.
+
+After login the frontend must call `POST /api/auth/profile` to upsert the profile row — profiles are not auto-created on signup.
 
 ### Publish pipeline
 
-1. User creates a post via `POST /api/posts/` → status `draft` or `scheduled`
-2. User triggers scheduling via `POST /api/posts/{id}/schedule` → creates `PublishJob` rows (one per platform), sets `scheduled_at`, status becomes `scheduled`
-3. Vercel Cron fires `POST /api/jobs/process-due` every minute → calls `run_due_posts()` → finds all posts where `status = scheduled AND scheduled_at <= now`
-4. `publish_post()` in `backend/app/workers/publish_task.py` decrypts the OAuth token, calls the platform service, updates job + post status
+1. `POST /api/posts/` → creates post, status `draft` or `scheduled`
+2. `POST /api/posts/{id}/schedule` → sets `scheduled_at`, creates one `PublishJob` row per platform, status becomes `scheduled`
+3. Cron fires `POST /api/jobs/process-due` → `run_due_posts()` claims all due posts atomically (sets status to `publishing` before publishing begins), then publishes each
+4. `_publish()` in `backend/app/workers/publish_task.py` decrypts the OAuth token and calls the platform service
 5. Post status transitions: `draft` → `scheduled` → `publishing` → `done` / `failed`
-6. Failed jobs are retried up to 3 times on subsequent cron ticks (status = `retrying`)
+6. Jobs retry up to 3 times (status `retrying`); after 3 failures status becomes `failed`
 
 ### OAuth token storage
 
-Tokens are encrypted at rest with Fernet symmetric encryption. `ENCRYPT_KEY` must be a base64-encoded 32-byte key. Use `encrypt_token` / `decrypt_token` from `backend/app/core/security.py` — never store plaintext tokens.
+Tokens are encrypted at rest with Fernet symmetric encryption (`LargeBinary` column). Use `encrypt_token` / `decrypt_token` from `backend/app/core/security.py`. `ENCRYPT_KEY` must be a URL-safe base64-encoded 32-byte key.
 
 ### Platform services
 
-- `backend/app/services/facebook_service.py` — Facebook Graph API v19.0, handles photo upload + feed post, retries on rate limit codes 17/32/613
+- `backend/app/services/facebook_service.py` — Facebook Graph API v19.0, photo upload + feed post, retries on rate-limit codes 17/32/613 with exponential backoff
 - `backend/app/services/instagram_service.py` — Instagram via Graph API
 - `backend/app/services/linkedin_service.py` — LinkedIn v2 API
-- `backend/app/services/selenium_service.py` — Selenium fallback (not wired into the main publish flow)
+- `backend/app/services/selenium_service.py` — Selenium fallback, not wired into the publish flow
+
+The OAuth redirect URI is validated against an allowlist (`settings.frontend_url` + localhost) in `backend/app/api/accounts.py:_validate_redirect_uri`.
 
 ## Development Commands
 
@@ -45,19 +51,15 @@ Tokens are encrypted at rest with Fernet symmetric encryption. `ENCRYPT_KEY` mus
 ```bash
 cd backend
 
-# Install dependencies
 pip install -r requirements.txt
 
-# Copy and fill in env vars
-cp .env.example .env
+cp .env.example .env   # fill in env vars
 
-# Run database migrations
 alembic upgrade head
 
-# Create a new migration
+# New migration after model changes
 alembic revision --autogenerate -m "description"
 
-# Start API server (hot-reload)
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -66,31 +68,35 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```bash
 cd frontend
 
-# Install dependencies
 npm install
 
-# Copy and fill in env vars
-cp .env.example .env
+cp .env.example .env   # fill in env vars
 
-# Start dev server (http://localhost:5173)
-npm run dev
+npm run dev            # http://localhost:5173
 
-# Type-check and build
-npm run build
+npm run build          # tsc + vite build
 ```
 
 ## Environment Variables
 
-**Backend** (`backend/.env`): `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_JWT_SECRET`, `DATABASE_URL` (asyncpg format: `postgresql+asyncpg://...`), `ENCRYPT_KEY`, `CRON_SECRET`, `META_APP_ID`, `META_APP_SECRET`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`
-
-**Vercel env vars** (set in Vercel dashboard, mirror of backend .env for production): same keys as above. Vercel automatically injects `CRON_SECRET` into cron request headers — set the same value in both places.
+**Backend** (`backend/.env`):
+- `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_JWT_SECRET`
+- `DATABASE_URL` — asyncpg format: `postgresql+asyncpg://...`
+- `ENCRYPT_KEY` — URL-safe base64 32-byte key
+- `CRON_SECRET` — Vercel injects this into cron request headers; leave empty in dev to skip the check
+- `META_APP_ID`, `META_APP_SECRET`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`
+- `FRONTEND_URL` — defaults to `http://localhost:5173`; controls CORS and redirect URI allowlist
+- `SENTRY_DSN` — optional; enables Sentry tracing at 10% sample rate
+- `ENVIRONMENT` — defaults to `development`; sets log level (DEBUG in dev, INFO otherwise)
 
 **Frontend** (`frontend/.env`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_URL`
 
 ## Key Patterns
 
-- All API routes require `get_current_user_id` dependency — always scope DB queries to the authenticated `user_id`
-- `get_db` dependency auto-commits on success and rolls back on exception
-- SQLAlchemy models use `mapped_column` with explicit `UUID(as_uuid=True)` for PostgreSQL UUIDs
-- Frontend API calls go through the axios instance in `frontend/src/services/api.ts` which automatically injects the Supabase session token; a 401 triggers sign-out
-- TanStack Query hooks live in `frontend/src/hooks/`; React Query client config is in `frontend/src/lib/queryClient.ts`
+- All API routes depend on `get_current_user_id` — always scope DB queries to the authenticated `user_id`
+- `get_db` auto-commits on success and rolls back on exception
+- SQLAlchemy models use `mapped_column` with explicit `UUID(as_uuid=True)` for PostgreSQL UUIDs; `platforms` and `media_urls` are `ARRAY(Text)` columns
+- `profiles.id` must equal the Supabase `auth.users.id` UUID — it is not auto-generated
+- Frontend API calls use the axios instance in `frontend/src/services/api.ts`; a 401 response attempts a session refresh before signing out
+- TanStack Query hooks live in `frontend/src/hooks/`; query client config is in `frontend/src/lib/queryClient.ts`
+- Shared TypeScript types (Post, PublishJob, SocialAccount, Platform, etc.) are in `frontend/src/types/index.ts`

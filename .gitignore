@@ -47,3 +47,5 @@ celerybeat.pid
 # ── Selenium ──────────────────────────────────────────────────────────
 chromedriver
 chromedriver.exe
+
+.vercel
