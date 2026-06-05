@@ -10,5 +10,10 @@
       "maxDuration": 30
     }
   },
-  "crons": []
+  "crons": [
+    {
+      "path": "/api/jobs/process-due",
+      "schedule": "0 * * * *"
+    }
+  ]
 }
