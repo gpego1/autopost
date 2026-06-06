@@ -97,9 +97,11 @@ export function PostCard({ post }: PostCardProps) {
           <div className="flex items-center gap-1.5 text-slate-400 text-xs">
             <Calendar className="w-3.5 h-3.5" />
             <span>
-              {format(new Date(post.scheduled_at), "dd MMM 'às' HH:mm", {
-                locale: ptBR,
-              })}
+              {format(
+                new Date(/Z|[+-]\d{2}:?\d{2}$/.test(post.scheduled_at) ? post.scheduled_at : post.scheduled_at + 'Z'),
+                "dd MMM 'às' HH:mm",
+                { locale: ptBR },
+              )}
             </span>
           </div>
         )}

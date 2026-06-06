@@ -36,7 +36,9 @@ export function Composer() {
       setContent(existingPost.content)
       setPlatforms(existingPost.platforms)
       if (existingPost.scheduled_at) {
-        setScheduledAt(existingPost.scheduled_at.slice(0, 16))
+        const utc = new Date(existingPost.scheduled_at)
+        const local = new Date(utc.getTime() - utc.getTimezoneOffset() * 60000)
+        setScheduledAt(local.toISOString().slice(0, 16))
       }
     }
   }, [existingPost])
