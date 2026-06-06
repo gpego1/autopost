@@ -110,6 +110,19 @@ async def meta_oauth_callback(
     connection is never held idle waiting for Meta API responses (which can cause
     the backend to silently close it after a few seconds of inactivity).
     """
+    try:
+        return await _meta_oauth_callback_impl(payload, user_id)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("meta_oauth_callback unhandled exception for user %s", user_id)
+        raise
+
+
+async def _meta_oauth_callback_impl(
+    payload: OAuthCallbackRequest,
+    user_id: UUID,
+) -> list[SocialAccount]:
     _validate_redirect_uri(payload.redirect_uri)
 
     # ── All external HTTP calls first (no DB connection open yet) ─────────────
