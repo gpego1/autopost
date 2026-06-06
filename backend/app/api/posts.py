@@ -11,6 +11,7 @@ from app.models.post import Post
 from app.models.publish_job import PublishJob
 from app.models.social_account import SocialAccount
 from app.schemas.post import PostCreate, PostResponse, PostStatus, PostUpdate, SchedulePostRequest
+from app.workers.publish_task import _publish_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +167,33 @@ async def schedule_post(
     logger.info("Scheduled post %s for %s", post.id, payload.scheduled_at)
 
     return post
+
+
+@router.post("/{post_id}/publish-now", response_model=dict)
+async def publish_now(
+    post_id: UUID,
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Immediately publish a scheduled post, bypassing the cron schedule."""
+    post = await _get_owned_post(post_id, user_id, db)
+
+    if post.status not in ("scheduled", "failed"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Não é possível publicar um post com status '{post.status}'.",
+        )
+
+    try:
+        result = await _publish_by_id(str(post_id))
+    except Exception as exc:
+        logger.error("publish-now failed for post %s: %s", post_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro ao publicar o post.",
+        ) from exc
+
+    return result
 
 
 async def _get_owned_post(

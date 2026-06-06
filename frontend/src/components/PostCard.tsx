@@ -1,9 +1,9 @@
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Calendar, Edit2, Facebook, Instagram, Linkedin, Trash2 } from 'lucide-react'
+import { Calendar, Edit2, Facebook, Instagram, Linkedin, Loader2, Send, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { StatusBadge } from './StatusBadge'
-import { useDeletePost } from '@/hooks/usePosts'
+import { useDeletePost, usePublishNow } from '@/hooks/usePosts'
 import type { Platform, Post } from '@/types'
 
 const PlatformIcon = ({ platform }: { platform: Platform }) => {
@@ -33,6 +33,7 @@ interface PostCardProps {
 export function PostCard({ post }: PostCardProps) {
   const navigate = useNavigate()
   const deletePost = useDeletePost()
+  const publishNow = usePublishNow()
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -44,6 +45,13 @@ export function PostCard({ post }: PostCardProps) {
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation()
     navigate(`/composer/${post.id}`)
+  }
+
+  const handlePublishNow = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (confirm('Publicar este post agora nas plataformas selecionadas?')) {
+      await publishNow.mutateAsync(post.id)
+    }
   }
 
   const contentPreview =
@@ -99,6 +107,20 @@ export function PostCard({ post }: PostCardProps) {
 
       {/* Actions — visible on hover */}
       <div className="mt-3 pt-3 border-t border-navy-600 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        {(post.status === 'scheduled' || post.status === 'failed') && (
+          <button
+            onClick={handlePublishNow}
+            disabled={publishNow.isPending}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-green-400 hover:text-green-300 hover:bg-green-900/30 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {publishNow.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Send className="w-3.5 h-3.5" />
+            )}
+            Publicar agora
+          </button>
+        )}
         <button
           onClick={handleEdit}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-navy-600 rounded-lg transition-colors"

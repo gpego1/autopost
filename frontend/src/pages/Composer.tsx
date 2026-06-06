@@ -180,7 +180,7 @@ export function Composer() {
             type="datetime-local"
             value={scheduledAt}
             onChange={e => setScheduledAt(e.target.value)}
-            min={new Date().toISOString().slice(0, 16)}
+            min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
             className="w-full bg-navy-800 border border-navy-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary-500 text-sm [color-scheme:dark]"
           />
         </div>

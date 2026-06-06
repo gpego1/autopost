@@ -33,3 +33,7 @@ export const schedulePost = async (
   const { data } = await api.post<Post>(`/posts/${id}/schedule`, { scheduled_at })
   return data
 }
+
+export const publishPostNow = async (id: string): Promise<void> => {
+  await api.post(`/posts/${id}/publish-now`)
+}

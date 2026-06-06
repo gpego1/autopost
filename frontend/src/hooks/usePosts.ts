@@ -4,6 +4,7 @@ import {
   deletePost,
   getPost,
   getPosts,
+  publishPostNow,
   schedulePost,
   updatePost,
 } from '@/services/postsApi'
@@ -64,6 +65,16 @@ export function useSchedulePost() {
     mutationFn: ({ id, scheduled_at }) => schedulePost(id, scheduled_at),
     onSuccess: (updated) => {
       qc.setQueryData([POSTS_KEY, updated.id], updated)
+      qc.invalidateQueries({ queryKey: [POSTS_KEY] })
+    },
+  })
+}
+
+export function usePublishNow() {
+  const qc = useQueryClient()
+  return useMutation<void, Error, string>({
+    mutationFn: publishPostNow,
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: [POSTS_KEY] })
     },
   })
