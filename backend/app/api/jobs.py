@@ -67,8 +67,9 @@ async def process_due_posts(
     logger.info("Cron triggered: processing due posts")
     try:
         return await run_due_posts()
-    except BaseException as exc:
-        import traceback
-        tb = traceback.format_exc()
-        logger.error("Cron run_due_posts failed: %s\n%s", exc, tb)
-        return {"error": type(exc).__name__, "detail": str(exc), "traceback": tb}
+    except Exception as exc:
+        logger.error("Cron run_due_posts failed: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Cron job failed",
+        ) from exc

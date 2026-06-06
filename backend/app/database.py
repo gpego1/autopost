@@ -10,6 +10,10 @@ engine = create_async_engine(
     settings.database_url,
     echo=settings.environment == "development",
     poolclass=NullPool,
+    # Supabase uses PgBouncer in transaction mode, which does not support
+    # asyncpg's prepared statement cache. Disable it to avoid
+    # DuplicatePreparedStatementError on reused PgBouncer connections.
+    connect_args={"statement_cache_size": 0},
 )
 
 AsyncSessionLocal = async_sessionmaker(
