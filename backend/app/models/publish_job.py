@@ -22,6 +22,12 @@ class PublishJob(Base):
         nullable=False,
         index=True,
     )
+    social_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("social_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     platform: Mapped[str] = mapped_column(String(50), nullable=False)
     method: Mapped[str] = mapped_column(
         String(50), nullable=False, default="graph_api"
@@ -36,6 +42,7 @@ class PublishJob(Base):
     )
 
     post = relationship("Post", back_populates="publish_jobs")
+    social_account = relationship("SocialAccount")
 
     def __repr__(self) -> str:
         return f"<PublishJob id={self.id} platform={self.platform} status={self.status}>"

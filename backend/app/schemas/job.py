@@ -17,6 +17,7 @@ class JobStatus(str, Enum):
 class PublishJobResponse(BaseModel):
     id: UUID
     post_id: UUID
+    social_account_id: Optional[UUID]
     platform: str
     method: str
     status: JobStatus

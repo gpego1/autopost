@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user_id, get_db
 from app.models.post import Post
 from app.models.publish_job import PublishJob
+from app.models.social_account import SocialAccount
 from app.schemas.post import PostCreate, PostResponse, PostStatus, PostUpdate, SchedulePostRequest
 
 logger = logging.getLogger(__name__)
@@ -135,11 +136,27 @@ async def schedule_post(
         await db.delete(job)
 
     for platform in post.platforms:
+        account_result = await db.execute(
+            select(SocialAccount)
+            .where(
+                SocialAccount.user_id == user_id,
+                SocialAccount.platform == platform,
+                SocialAccount.is_active == True,
+            )
+            .limit(1)
+        )
+        account = account_result.scalar_one_or_none()
+        if account is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"No connected {platform} account found. Please connect an account first.",
+            )
         job = PublishJob(
             post_id=post.id,
             platform=platform,
             method="graph_api",
             status="pending",
+            social_account_id=account.id,
         )
         db.add(job)
 

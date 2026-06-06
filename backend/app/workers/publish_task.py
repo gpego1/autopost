@@ -109,13 +109,24 @@ async def _publish(db: AsyncSession, post_id: str) -> dict:
         await db.flush()
 
         try:
-            account_result = await db.execute(
-                select(SocialAccount).where(
-                    SocialAccount.user_id == post.user_id,
-                    SocialAccount.platform == job.platform,
-                    SocialAccount.is_active == True,
+            if job.social_account_id is not None:
+                account_result = await db.execute(
+                    select(SocialAccount).where(
+                        SocialAccount.id == job.social_account_id,
+                        SocialAccount.is_active == True,
+                    )
                 )
-            )
+            else:
+                # Fallback for jobs created before social_account_id was added
+                account_result = await db.execute(
+                    select(SocialAccount)
+                    .where(
+                        SocialAccount.user_id == post.user_id,
+                        SocialAccount.platform == job.platform,
+                        SocialAccount.is_active == True,
+                    )
+                    .limit(1)
+                )
             account = account_result.scalar_one_or_none()
             if account is None:
                 raise ValueError(f"No active {job.platform} account for user {post.user_id}")
