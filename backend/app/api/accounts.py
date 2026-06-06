@@ -102,14 +102,18 @@ META_ACCOUNTS_URL = "https://graph.facebook.com/v19.0/me/accounts"
 async def meta_oauth_callback(
     payload: OAuthCallbackRequest,
     user_id: UUID = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
 ) -> list[SocialAccount]:
     """Handle Meta OAuth callback: exchange code for token, fetch managed Pages
     and save each Page as a separate SocialAccount with its own Page access token.
+
+    The DB session is opened only AFTER all external HTTP calls complete, so the
+    connection is never held idle waiting for Meta API responses (which can cause
+    the backend to silently close it after a few seconds of inactivity).
     """
     _validate_redirect_uri(payload.redirect_uri)
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    # ── All external HTTP calls first (no DB connection open yet) ─────────────
+    async with httpx.AsyncClient(timeout=15) as client:
         token_resp = await client.get(
             META_TOKEN_URL,
             params={
@@ -164,38 +168,42 @@ async def meta_oauth_callback(
             detail="Nenhuma Página do Facebook encontrada. Certifique-se de ter pelo menos uma Página e ser administrador dela.",
         )
 
-    saved_accounts: list[SocialAccount] = []
-    for page in pages_data:
-        page_id = page["id"]
-        page_name = page.get("name", "Facebook Page")
-        page_token = page.get("access_token", user_access_token)
+    # ── Open DB session only now, after all HTTP calls are done ───────────────
+    from app.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        saved_accounts: list[SocialAccount] = []
+        for page in pages_data:
+            page_id = page["id"]
+            page_name = page.get("name", "Facebook Page")
+            page_token = page.get("access_token", user_access_token)
 
-        existing = await db.execute(
-            select(SocialAccount).where(
-                SocialAccount.user_id == user_id,
-                SocialAccount.platform == "facebook",
-                SocialAccount.platform_user_id == page_id,
+            existing = await db.execute(
+                select(SocialAccount).where(
+                    SocialAccount.user_id == user_id,
+                    SocialAccount.platform == "facebook",
+                    SocialAccount.platform_user_id == page_id,
+                )
             )
-        )
-        account = existing.scalar_one_or_none()
+            account = existing.scalar_one_or_none()
 
-        if account is None:
-            account = SocialAccount(
-                user_id=user_id,
-                platform="facebook",
-                account_name=page_name,
-                platform_user_id=page_id,
-            )
-            db.add(account)
+            if account is None:
+                account = SocialAccount(
+                    user_id=user_id,
+                    platform="facebook",
+                    account_name=page_name,
+                    platform_user_id=page_id,
+                )
+                db.add(account)
 
-        account.access_token = encrypt_token(page_token)
-        account.token_expires_at = None  # Page tokens are long-lived
-        account.is_active = True
-        saved_accounts.append(account)
+            account.access_token = encrypt_token(page_token)
+            account.token_expires_at = None
+            account.is_active = True
+            saved_accounts.append(account)
 
-    await db.flush()
-    for account in saved_accounts:
-        await db.refresh(account)
+        await db.flush()
+        for account in saved_accounts:
+            await db.refresh(account)
+        await db.commit()
 
     logger.info("Connected %d Facebook Page(s) for user %s", len(saved_accounts), user_id)
     return saved_accounts
@@ -209,12 +217,16 @@ async def meta_oauth_callback(
 async def linkedin_oauth_callback(
     payload: OAuthCallbackRequest,
     user_id: UUID = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
 ) -> SocialAccount:
-    """Handle LinkedIn OAuth callback: exchange code for token and save account."""
+    """Handle LinkedIn OAuth callback: exchange code for token and save account.
+
+    DB session opened only after all external HTTP calls to avoid idle connection
+    being closed by PgBouncer/backend timeout.
+    """
     _validate_redirect_uri(payload.redirect_uri)
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    # ── All external HTTP calls first (no DB connection open yet) ─────────────
+    async with httpx.AsyncClient(timeout=15) as client:
         token_resp = await client.post(
             LINKEDIN_TOKEN_URL,
             data={
@@ -257,32 +269,37 @@ async def linkedin_oauth_callback(
     platform_user_id = me_data.get("sub", me_data.get("id", "unknown"))
     account_name = me_data.get("name", me_data.get("localizedFirstName", "Unknown"))
 
-    existing = await db.execute(
-        select(SocialAccount).where(
-            SocialAccount.user_id == user_id,
-            SocialAccount.platform == "linkedin",
-            SocialAccount.platform_user_id == platform_user_id,
+    # ── Open DB session only now, after all HTTP calls are done ───────────────
+    from app.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        existing = await db.execute(
+            select(SocialAccount).where(
+                SocialAccount.user_id == user_id,
+                SocialAccount.platform == "linkedin",
+                SocialAccount.platform_user_id == platform_user_id,
+            )
         )
-    )
-    account = existing.scalar_one_or_none()
+        account = existing.scalar_one_or_none()
 
-    if account is None:
-        account = SocialAccount(
-            user_id=user_id,
-            platform="linkedin",
-            account_name=account_name,
-            platform_user_id=platform_user_id,
-        )
-        db.add(account)
+        if account is None:
+            account = SocialAccount(
+                user_id=user_id,
+                platform="linkedin",
+                account_name=account_name,
+                platform_user_id=platform_user_id,
+            )
+            db.add(account)
 
-    account.access_token = encrypt_token(access_token)
-    if refresh_token:
-        account.refresh_token = encrypt_token(refresh_token)
-    account.token_expires_at = token_expires_at
-    account.is_active = True
+        account.access_token = encrypt_token(access_token)
+        if refresh_token:
+            account.refresh_token = encrypt_token(refresh_token)
+        account.token_expires_at = token_expires_at
+        account.is_active = True
 
-    await db.flush()
-    await db.refresh(account)
+        await db.flush()
+        await db.refresh(account)
+        await db.commit()
+
     logger.info("Connected LinkedIn account %s for user %s", platform_user_id, user_id)
     return account
 
