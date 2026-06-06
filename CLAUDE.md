@@ -12,7 +12,7 @@ AutoPost is a social media scheduling platform. Users connect Facebook, Instagra
 
 **Frontend** (`frontend/`) — React 18 + Vite + TanStack Query + Tailwind CSS, deployed as a Vercel static site. React Router v6 with `<ProtectedRoute>` gating authenticated pages.
 
-**Scheduled publishing** — Vercel Cron Job calls `POST /api/jobs/process-due` once daily at midnight UTC (`0 0 * * *`), configured in `vercel.json`. The endpoint uses `SELECT FOR UPDATE SKIP LOCKED` so concurrent invocations never pick up the same post twice.
+**Scheduled publishing** — Vercel Cron Job calls `POST /api/jobs/process-due` once daily at midnight São Paulo time (`0 3 * * *` UTC = 00:00 UTC-3), configured in `vercel.json`. The endpoint uses `SELECT FOR UPDATE SKIP LOCKED` so concurrent invocations never pick up the same post twice.
 
 **Database** — `NullPool` is intentional in `backend/app/database.py`; serverless functions must not maintain a persistent connection pool.
 
@@ -108,3 +108,38 @@ There are no tests and no linting/formatting configuration in this repo.
 - Frontend API calls use the axios instance in `frontend/src/services/api.ts`; a 401 response attempts a session refresh before signing out
 - TanStack Query hooks live in `frontend/src/hooks/`; query client config is in `frontend/src/lib/queryClient.ts`
 - Shared TypeScript types (Post, PublishJob, SocialAccount, Platform, etc.) are in `frontend/src/types/index.ts`
+
+### OAuth callback pattern (important)
+
+`meta_oauth_callback` and `linkedin_oauth_callback` in `backend/app/api/accounts.py` do **not** use `Depends(get_db)`. They open `AsyncSessionLocal()` manually, **only after** all external HTTP calls complete. Reason: `Depends(get_db)` opens the DB connection before the function body, so the connection sits idle during 3 Meta API calls (~seconds); PgBouncer closes idle connections and the DB operations then fail. Never refactor these callbacks to use `Depends(get_db)`.
+
+### Database / PgBouncer
+
+`backend/app/database.py:_resolve_db_url` auto-converts `db.<ref>.supabase.co:5432` to the Supabase **Session Pooler** (`aws-0-us-east-1.pooler.supabase.com:5432`). The production `DATABASE_URL` already uses the Session Pooler directly. `NullPool` + `statement_cache_size=0` are both required. Do not switch to a connection pool or remove these settings.
+
+### datetime / timezone handling
+
+- Cron always runs in UTC; `0 3 * * *` = midnight São Paulo (UTC-3).
+- `datetime-local` inputs are local time; use `new Date(scheduledAt).toISOString()` to convert to UTC before sending.
+- Dates from the API have no `Z` suffix; append `'Z'` before passing to `new Date()` so browsers interpret them as UTC, not local time.
+
+### Publish-now endpoint
+
+`POST /api/posts/{id}/publish-now` (added in `backend/app/api/posts.py`) allows immediate publishing of `scheduled` or `failed` posts. The button appears on hover in `PostCard` for those statuses.
+
+## Current state (2026-06-06)
+
+### What works (verified end-to-end)
+- Creating, scheduling, and publishing posts — confirmed a live Facebook post published successfully.
+- `POST /api/posts/{id}/publish-now` works and actually publishes to Facebook.
+- Timezone is displayed correctly in PostCard and Composer (no more +3 hour offset).
+
+### Open issue: Facebook OAuth callback (connecting a new account)
+
+`POST /api/accounts/connect/meta/callback` still returns 500 intermittently. The likely cause is a PgBouncer connection issue during Vercel cold starts — all DB-dependent endpoints fail for ~10–20 seconds after a cold start.
+
+**What was tried:**
+- Moved DB session open to after HTTP calls — deployed in commit `914c3a3`.
+- Added top-level `try/except` with `logger.exception` to surface the full traceback — deployed in commit `0567322`.
+
+**Next step:** Have the user try to connect Facebook again after a cold start. The `logger.exception` wrapper will now write the full Python traceback to Vercel logs. Fetch logs with the Vercel MCP (`get_runtime_logs`, project `prj_X3eYfNhRb7ZPMSXyPN4y4aF4MuoD`, team `team_bVAEU5rN0oQXkOkJvVL7s1vM`) and search for `"meta_oauth_callback unhandled exception"` to find the root cause.
