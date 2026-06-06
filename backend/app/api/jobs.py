@@ -67,6 +67,8 @@ async def process_due_posts(
     logger.info("Cron triggered: processing due posts")
     try:
         return await run_due_posts()
-    except Exception as exc:
-        logger.exception("Cron run_due_posts failed: %s", exc)
-        raise
+    except BaseException as exc:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error("Cron run_due_posts failed: %s\n%s", exc, tb)
+        return {"error": type(exc).__name__, "detail": str(exc), "traceback": tb}
