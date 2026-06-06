@@ -12,7 +12,7 @@ AutoPost is a social media scheduling platform. Users connect Facebook, Instagra
 
 **Frontend** (`frontend/`) — React 18 + Vite + TanStack Query + Tailwind CSS, deployed as a Vercel static site. React Router v6 with `<ProtectedRoute>` gating authenticated pages.
 
-**Scheduled publishing** — Vercel Cron Job calls `POST /api/jobs/process-due` every minute. The `crons` array in `vercel.json` is currently empty — add the cron entry there for production. The endpoint uses `SELECT FOR UPDATE SKIP LOCKED` so concurrent invocations never pick up the same post twice.
+**Scheduled publishing** — Vercel Cron Job calls `POST /api/jobs/process-due` once daily at midnight UTC (`0 0 * * *`), configured in `vercel.json`. The endpoint uses `SELECT FOR UPDATE SKIP LOCKED` so concurrent invocations never pick up the same post twice.
 
 **Database** — `NullPool` is intentional in `backend/app/database.py`; serverless functions must not maintain a persistent connection pool.
 
@@ -48,6 +48,8 @@ The OAuth redirect URI is validated against an allowlist (`settings.frontend_url
 
 ### Backend
 
+There are two `requirements.txt` files: `backend/requirements.txt` for local dev (includes `python-jose`, `supabase`, `passlib`) and `api/requirements.txt` for the Vercel serverless function. When adding a dependency needed at runtime in production, update both.
+
 ```bash
 cd backend
 
@@ -77,6 +79,8 @@ npm run dev            # http://localhost:5173
 npm run build          # tsc + vite build
 ```
 
+In dev, Vite proxies `/api/*` to `http://localhost:8000`. The `@` alias resolves to `frontend/src/` (e.g. `import { Post } from '@/types'`).
+
 ## Environment Variables
 
 **Backend** (`backend/.env`):
@@ -90,6 +94,10 @@ npm run build          # tsc + vite build
 - `ENVIRONMENT` — defaults to `development`; sets log level (DEBUG in dev, INFO otherwise)
 
 **Frontend** (`frontend/.env`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_URL`
+
+## Testing & Linting
+
+There are no tests and no linting/formatting configuration in this repo.
 
 ## Key Patterns
 
