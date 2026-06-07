@@ -137,6 +137,17 @@ Before redirecting the user to the provider, `Accounts.tsx` writes `sessionStora
 
 `POST /api/posts/{id}/publish-now` (`backend/app/api/posts.py`) allows immediate publishing of `scheduled` or `failed` posts. The button appears on hover in `PostCard` for those statuses.
 
+## Supabase Dashboard configuration (manual, one-time)
+
+These settings must be applied by an admin in the Supabase Dashboard and are not managed by code:
+
+- **Authentication → URL Configuration → Site URL**: set to `https://autopost-five.vercel.app`
+- **Authentication → URL Configuration → Redirect URLs (allowlist)**: add both
+  - `https://autopost-five.vercel.app/**`
+  - `http://localhost:5173/**`
+
+Without these entries, email confirmation links default to whatever "Site URL" is set in the dashboard. The code-side fix (`emailRedirectTo: window.location.origin` in `useAuth.ts`) overrides the destination at signup time, but Supabase still validates the redirect URL against the allowlist above — so both changes are required.
+
 ## Current state (2026-06-07)
 
 ### What works (verified end-to-end)
