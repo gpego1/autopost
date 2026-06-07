@@ -12,7 +12,7 @@ AutoPost is a social media scheduling platform. Users connect Facebook, Instagra
 
 **Frontend** (`frontend/`) — React 18 + Vite + TanStack Query + Tailwind CSS, deployed as a Vercel static site. React Router v6 with `<ProtectedRoute>` gating authenticated pages.
 
-**Scheduled publishing** — Vercel Cron Job calls `POST /api/jobs/process-due` every 5 minutes (`*/5 * * * *`), configured in `vercel.json`. The endpoint uses `SELECT FOR UPDATE SKIP LOCKED` so concurrent invocations never pick up the same post twice. Each run publishes all posts where `scheduled_at <= now` and `status = 'scheduled'`, so posts go out within ~5 minutes of their scheduled time.
+**Scheduled publishing** — Vercel Cron Job calls `POST /api/jobs/process-due` daily at `0 3 * * *` UTC (midnight São Paulo, UTC-3), configured in `vercel.json`. The Hobby plan only allows daily crons; for timely publishing an external cron service (e.g. cron-job.org) should call the same endpoint every 5 minutes with `Authorization: Bearer <CRON_SECRET>`. The endpoint uses `SELECT FOR UPDATE SKIP LOCKED` so concurrent invocations never pick up the same post twice.
 
 **Database** — `NullPool` is intentional in `backend/app/database.py`; serverless functions must not maintain a persistent connection pool.
 
@@ -129,7 +129,7 @@ Before redirecting the user to the provider, `Accounts.tsx` writes `sessionStora
 
 ### datetime / timezone handling
 
-- Cron runs every 5 minutes (`*/5 * * * *`) in UTC; posts are published within ~5 min of `scheduled_at`.
+- Cron runs daily at `0 3 * * *` UTC = midnight São Paulo (UTC-3). For timely publishing, use an external cron service calling the endpoint every 5 min (see CLAUDE.md Architecture section).
 - `datetime-local` inputs are local time; use `new Date(scheduledAt).toISOString()` to convert to UTC before sending.
 - Dates from the API have no `Z` suffix; append `'Z'` before passing to `new Date()` so browsers interpret them as UTC, not local time.
 

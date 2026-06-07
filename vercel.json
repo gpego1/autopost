@@ -13,7 +13,7 @@
   "crons": [
     {
       "path": "/api/jobs/process-due",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }
