@@ -12,7 +12,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 
 const navItems = [
@@ -31,6 +31,7 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [dark, setDark] = useState(() =>
     document.documentElement.classList.contains('dark')
   )
@@ -46,11 +47,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     document.documentElement.classList.toggle('dark', next)
   }
 
-  // Close sidebar on navigation (mobile)
+  // Close sidebar on route change (mobile)
   useEffect(() => {
     onClose()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate])
+  }, [location.pathname, onClose])
 
   return (
     <aside

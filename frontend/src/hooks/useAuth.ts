@@ -22,27 +22,33 @@ export function useAuth(): UseAuthReturn {
   })
 
   useEffect(() => {
-    // Get the current session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setState({
-        user: session?.user ?? null,
-        session,
-        loading: false,
+    let mounted = true
+
+    // Get the current session on mount; catch errors so loading never stays true
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (mounted) {
+          setState({ user: session?.user ?? null, session, loading: false })
+        }
       })
-    })
+      .catch((err) => {
+        console.error('Auth session error:', err)
+        if (mounted) {
+          setState({ user: null, session: null, loading: false })
+        }
+      })
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setState({
-          user: session?.user ?? null,
-          session,
-          loading: false,
-        })
+        if (mounted) {
+          setState({ user: session?.user ?? null, session, loading: false })
+        }
       }
     )
 
     return () => {
+      mounted = false
       subscription.unsubscribe()
     }
   }, [])

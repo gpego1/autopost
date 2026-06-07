@@ -22,15 +22,27 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// Response interceptor: on 401 try to refresh the session first;
+// Response interceptor: on 401 try to refresh the session and retry once;
 // only sign out and redirect if there is truly no valid session.
+let isSigningOut = false
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    const originalRequest = error.config as typeof error.config & { _retry?: boolean }
+    if (error.response?.status === 401 && !originalRequest?._retry && !isSigningOut) {
+      originalRequest!._retry = true
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+      if (session?.access_token) {
+        // Token was refreshed — retry the original request with fresh token
+        originalRequest!.headers!['Authorization'] = `Bearer ${session.access_token}`
+        return api(originalRequest!)
+      }
+      // No session at all — sign out once and redirect
+      isSigningOut = true
+      try {
         await supabase.auth.signOut()
+      } finally {
         window.location.href = '/login'
       }
     }

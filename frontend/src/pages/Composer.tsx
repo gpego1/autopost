@@ -31,7 +31,7 @@ export function Composer() {
   const connectedPlatforms = new Set(accounts.filter(a => a.is_active).map(a => a.platform))
 
   useEffect(() => {
-    if (existingPost) {
+    if (existingPost?.id) {
       setTitle(existingPost.title ?? '')
       setContent(existingPost.content)
       setPlatforms(existingPost.platforms)
@@ -41,7 +41,7 @@ export function Composer() {
         setScheduledAt(local.toISOString().slice(0, 16))
       }
     }
-  }, [existingPost])
+  }, [existingPost?.id])
 
   const togglePlatform = (platform: Platform) => {
     setPlatforms(prev =>

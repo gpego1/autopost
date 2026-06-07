@@ -49,3 +49,4 @@ chromedriver
 chromedriver.exe
 
 .vercel
+.env*

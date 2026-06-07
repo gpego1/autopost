@@ -38,7 +38,11 @@ export function PostCard({ post }: PostCardProps) {
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (confirm('Tem certeza que deseja excluir este post?')) {
-      await deletePost.mutateAsync(post.id)
+      try {
+        await deletePost.mutateAsync(post.id)
+      } catch (error: any) {
+        alert(error?.response?.data?.detail ?? 'Erro ao excluir post. Tente novamente.')
+      }
     }
   }
 
@@ -50,7 +54,11 @@ export function PostCard({ post }: PostCardProps) {
   const handlePublishNow = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (confirm('Publicar este post agora nas plataformas selecionadas?')) {
-      await publishNow.mutateAsync(post.id)
+      try {
+        await publishNow.mutateAsync(post.id)
+      } catch (error: any) {
+        alert(error?.response?.data?.detail ?? 'Erro ao publicar post. Tente novamente.')
+      }
     }
   }
 
