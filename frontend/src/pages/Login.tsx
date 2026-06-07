@@ -108,15 +108,6 @@ export function Login() {
               )}
             </div>
 
-            <div className="flex justify-end">
-              <Link
-                to="/forgot-password"
-                className="text-sm text-muted-foreground hover:text-primary transition-colors"
-              >
-                Esqueci minha senha
-              </Link>
-            </div>
-
             {/* Submit */}
             <button
               type="submit"
@@ -132,6 +123,12 @@ export function Login() {
                 'Entrar'
               )}
             </button>
+
+            <p className="text-center text-xs text-muted-foreground">
+              <Link to="/forgot-password" className="hover:text-primary transition-colors">
+                Esqueci minha senha
+              </Link>
+            </p>
           </form>
 
           <p className="mt-6 text-center text-muted-foreground text-sm">
