@@ -72,7 +72,7 @@ export function useAuth(): UseAuthReturn {
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: `${window.location.origin}/email-confirmed`,
       },
     })
     if (error) return { error: error.message }
