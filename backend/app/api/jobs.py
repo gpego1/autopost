@@ -32,6 +32,28 @@ async def list_jobs(
     return list(result.scalars().all())
 
 
+@router.get("/process-due", include_in_schema=False)
+async def process_due_posts(
+    authorization: str | None = Header(None),
+) -> dict:
+    """Vercel Cron endpoint: publish all posts whose scheduled_at <= now.
+    Vercel sends GET requests for cron jobs with Authorization: Bearer <CRON_SECRET>.
+    Must be defined before /{job_id} to avoid being captured by the UUID route.
+    """
+    if authorization != f"Bearer {settings.cron_secret}":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    logger.info("Cron triggered: processing due posts")
+    try:
+        return await run_due_posts()
+    except Exception as exc:
+        logger.error("Cron run_due_posts failed: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Cron job failed",
+        ) from exc
+
+
 @router.get("/{job_id}", response_model=PublishJobResponse)
 async def get_job(
     job_id: UUID,
@@ -51,25 +73,3 @@ async def get_job(
             detail="Publish job not found",
         )
     return job
-
-
-@router.post("/process-due", include_in_schema=False)
-async def process_due_posts(
-    authorization: str | None = Header(None),
-) -> dict:
-    """Vercel Cron endpoint: publish all posts whose scheduled_at <= now.
-    Always requires Authorization: Bearer <CRON_SECRET>.
-    Set CRON_SECRET in Vercel env vars — Vercel injects it into cron requests automatically.
-    """
-    if authorization != f"Bearer {settings.cron_secret}":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-
-    logger.info("Cron triggered: processing due posts")
-    try:
-        return await run_due_posts()
-    except Exception as exc:
-        logger.error("Cron run_due_posts failed: %s", exc, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Cron job failed",
-        ) from exc
