@@ -9,6 +9,7 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 
 from app.api import auth, posts, accounts, jobs
 from app.core.config import settings
+from app.core.security import _refresh_rsa_keys
 
 logging.basicConfig(
     level=logging.INFO if settings.environment != "development" else logging.DEBUG,
@@ -21,6 +22,12 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown events."""
     logger.info("AutoPost backend starting up (environment: %s)", settings.environment)
+
+    # Pre-warm JWKS cache so the first request doesn't cold-start waiting on Supabase
+    try:
+        await _refresh_rsa_keys()
+    except Exception as exc:
+        logger.warning("JWKS pre-warm failed (will retry on first request): %s", exc)
 
     # Initialize Sentry if DSN is configured
     if settings.sentry_dsn:

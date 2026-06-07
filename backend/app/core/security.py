@@ -76,7 +76,7 @@ async def _refresh_rsa_keys() -> dict:
 
     url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
     logger.info("Fetching JWKS from %s", url)
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=4) as client:
         resp = await client.get(url)
         resp.raise_for_status()
         data = resp.json()
