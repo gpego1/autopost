@@ -32,9 +32,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [dark, setDark] = useState(() =>
-    document.documentElement.classList.contains('dark')
-  )
+  const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem('theme')
+    return saved ? saved === 'dark' : document.documentElement.classList.contains('dark')
+  })
 
   const handleSignOut = async () => {
     await signOut()
@@ -45,6 +46,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     const next = !dark
     setDark(next)
     document.documentElement.classList.toggle('dark', next)
+    localStorage.setItem('theme', next ? 'dark' : 'light')
   }
 
   // Close sidebar on route change (mobile)
