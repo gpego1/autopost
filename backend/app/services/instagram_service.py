@@ -151,7 +151,12 @@ class InstagramService:
                     "access_token": access_token,
                 },
             )
-            data = status_resp.json()
+            try:
+                data = status_resp.json()
+            except Exception:
+                logger.warning("Container %s: non-JSON status response, retrying", container_id)
+                await asyncio.sleep(poll_interval)
+                continue
             status_code = data.get("status_code", "")
 
             if status_code == "FINISHED":
@@ -168,7 +173,13 @@ class InstagramService:
 
     def _check_response(self, response: httpx.Response, context: str) -> dict:
         """Raise ValueError if the Graph API returned an error."""
-        data = response.json()
+        try:
+            data = response.json()
+        except Exception:
+            raise ValueError(
+                f"Instagram API returned non-JSON response during '{context}' "
+                f"[HTTP {response.status_code}]: {response.text[:200]}"
+            )
         if "error" in data:
             err = data["error"]
             raise ValueError(

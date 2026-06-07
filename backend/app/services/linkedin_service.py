@@ -103,10 +103,15 @@ class LinkedInService:
             headers=headers,
         )
         register_data = self._check_response(register_resp, "register upload")
-        upload_url = register_data["value"]["uploadMechanism"][
-            "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"
-        ]["uploadUrl"]
-        asset_urn = register_data["value"]["asset"]
+        try:
+            upload_url = register_data["value"]["uploadMechanism"][
+                "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"
+            ]["uploadUrl"]
+            asset_urn = register_data["value"]["asset"]
+        except (KeyError, TypeError) as exc:
+            raise ValueError(
+                f"Unexpected LinkedIn upload registration response: {exc}: {register_data}"
+            )
 
         # Step 2: Download the image from the URL and upload to LinkedIn
         image_resp = await client.get(image_url)

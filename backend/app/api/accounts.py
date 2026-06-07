@@ -142,7 +142,13 @@ async def _meta_oauth_callback_impl(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Failed to exchange Meta code: {token_resp.text}",
             )
-        token_data = token_resp.json()
+        try:
+            token_data = token_resp.json()
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Meta returned an invalid response during token exchange",
+            )
         user_access_token = token_data.get("access_token")
         logger.info("Meta token exchange OK, extending to long-lived token")
 
@@ -158,8 +164,12 @@ async def _meta_oauth_callback_impl(
             },
         )
         if ll_resp.status_code == 200:
-            user_access_token = ll_resp.json().get("access_token", user_access_token)
-            logger.info("Meta user token extended to long-lived successfully")
+            try:
+                user_access_token = ll_resp.json().get("access_token", user_access_token)
+            except Exception:
+                logger.warning("Failed to parse long-lived token response, using short-lived token")
+            else:
+                logger.info("Meta user token extended to long-lived successfully")
         else:
             logger.warning("Failed to extend user token, proceeding with short-lived: %s", ll_resp.text[:200])
 
@@ -173,7 +183,13 @@ async def _meta_oauth_callback_impl(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Failed to fetch Facebook Pages: {pages_resp.text}",
             )
-        pages_data = pages_resp.json().get("data", [])
+        try:
+            pages_data = pages_resp.json().get("data", [])
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Meta returned an invalid response when fetching Pages",
+            )
 
     if not pages_data:
         raise HTTPException(
@@ -186,7 +202,10 @@ async def _meta_oauth_callback_impl(
     async with AsyncSessionLocal() as db:
         saved_accounts: list[SocialAccount] = []
         for page in pages_data:
-            page_id = page["id"]
+            page_id = page.get("id")
+            if not page_id:
+                logger.warning("Skipping page without id: %s", page)
+                continue
             page_name = page.get("name", "Facebook Page")
             page_token = page.get("access_token", user_access_token)
 
@@ -256,7 +275,13 @@ async def linkedin_oauth_callback(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Failed to exchange LinkedIn code: {token_resp.text}",
             )
-        token_data = token_resp.json()
+        try:
+            token_data = token_resp.json()
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="LinkedIn returned an invalid response during token exchange",
+            )
         access_token = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
         expires_in = token_data.get("expires_in")
@@ -270,7 +295,13 @@ async def linkedin_oauth_callback(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to fetch LinkedIn user info",
             )
-        me_data = me_resp.json()
+        try:
+            me_data = me_resp.json()
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="LinkedIn returned an invalid response when fetching user info",
+            )
 
     token_expires_at: Optional[datetime] = None
     if expires_in:

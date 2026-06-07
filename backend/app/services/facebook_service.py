@@ -79,7 +79,12 @@ class FacebookService:
             if response.status_code == 200:
                 return response.json()
 
-            body = response.json()
+            try:
+                body = response.json()
+            except Exception:
+                raise ValueError(
+                    f"Facebook API error [HTTP {response.status_code}]: {response.text[:200]}"
+                )
             error = body.get("error", {})
             error_code = error.get("code", 0)
 
