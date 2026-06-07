@@ -1,10 +1,10 @@
-import { Calendar, CheckCircle2, Clock, LayoutDashboard, PenSquare, XCircle } from 'lucide-react'
+import { AlertCircle, Calendar, CheckCircle2, Clock, LayoutDashboard, PenSquare, XCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PostCard } from '@/components/PostCard'
 import { usePostsQuery } from '@/hooks/usePosts'
 
 export function Dashboard() {
-  const { data: posts = [], isLoading } = usePostsQuery()
+  const { data: posts = [], isLoading, isError } = usePostsQuery()
 
   const counts = {
     total: posts.length,
@@ -66,6 +66,12 @@ export function Dashboard() {
             {[1, 2, 3].map(i => (
               <div key={i} className="h-24 bg-card border border-border rounded-lg animate-pulse" />
             ))}
+          </div>
+        ) : isError ? (
+          <div className="text-center py-12 sm:py-16 bg-card border border-border rounded-lg">
+            <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-destructive mx-auto mb-4" />
+            <p className="text-foreground font-medium mb-1">Erro ao carregar posts</p>
+            <p className="text-muted-foreground text-sm">O servidor está temporariamente indisponível. Aguarde um instante e recarregue a página.</p>
           </div>
         ) : recentPosts.length === 0 ? (
           <div className="text-center py-12 sm:py-16 bg-card border border-border rounded-lg">

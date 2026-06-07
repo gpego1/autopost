@@ -27,7 +27,9 @@ async def lifespan(app: FastAPI):
     # Pre-warm JWKS cache so the first request doesn't cold-start waiting on Supabase
     try:
         await _refresh_rsa_keys()
-    except Exception as exc:
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except BaseException as exc:
         logger.warning("JWKS pre-warm failed (will retry on first request): %s", exc)
 
     # Initialize Sentry if DSN is configured

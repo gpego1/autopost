@@ -1,4 +1,4 @@
-import { Clock, PenSquare } from 'lucide-react'
+import { AlertCircle, Clock, PenSquare } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PostCard } from '@/components/PostCard'
 import { usePostsQuery } from '@/hooks/usePosts'
@@ -7,7 +7,7 @@ import type { PostStatus } from '@/types'
 const HISTORY_STATUSES: PostStatus[] = ['done', 'failed', 'publishing']
 
 export function History() {
-  const { data: allPosts = [], isLoading } = usePostsQuery()
+  const { data: allPosts = [], isLoading, isError } = usePostsQuery()
 
   const historyPosts = allPosts.filter(p => HISTORY_STATUSES.includes(p.status))
 
@@ -23,6 +23,12 @@ export function History() {
           {[1, 2, 3].map(i => (
             <div key={i} className="h-24 bg-card border border-border rounded-lg animate-pulse" />
           ))}
+        </div>
+      ) : isError ? (
+        <div className="text-center py-12 sm:py-16 bg-card border border-border rounded-lg">
+          <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-destructive mx-auto mb-4" />
+          <p className="text-foreground font-medium mb-1">Erro ao carregar histórico</p>
+          <p className="text-muted-foreground text-sm">O servidor está temporariamente indisponível. Aguarde um instante e recarregue a página.</p>
         </div>
       ) : historyPosts.length === 0 ? (
         <div className="text-center py-12 sm:py-16 bg-card border border-border rounded-lg">

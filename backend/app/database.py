@@ -46,7 +46,11 @@ engine = create_async_engine(
     _db_url,
     echo=settings.environment == "development",
     poolclass=NullPool,
-    connect_args={"statement_cache_size": 0},
+    connect_args={
+        "statement_cache_size": 0,
+        "timeout": 6,          # fail connection after 6 s (default: no timeout)
+        "command_timeout": 20, # fail individual queries after 20 s
+    },
 )
 
 AsyncSessionLocal = async_sessionmaker(
