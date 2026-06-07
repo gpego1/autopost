@@ -1,4 +1,5 @@
 import logging
+import traceback
 from contextlib import asynccontextmanager
 
 import sentry_sdk
@@ -7,10 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
+from sqlalchemy import text
 
 from app.api import auth, posts, accounts, jobs
 from app.core.config import settings
 from app.core.security import _refresh_rsa_keys
+from app.database import engine
 
 logging.basicConfig(
     level=logging.INFO if settings.environment != "development" else logging.DEBUG,
@@ -94,5 +97,20 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 @app.get("/health")
 async def health_check() -> dict:
-    """Health check endpoint for load balancers and deployment platforms."""
     return {"status": "ok", "environment": settings.environment}
+
+
+@app.get("/api/db-ping")
+async def db_ping() -> dict:
+    """Unauthenticated DB connectivity diagnostic. Returns exact connection error if any."""
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return {"status": "ok"}
+    except Exception as exc:
+        tb = traceback.format_exc()
+        logger.error("db-ping failed: %s\n%s", exc, tb)
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(exc), "traceback": tb},
+        )

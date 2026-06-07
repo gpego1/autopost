@@ -48,8 +48,8 @@ engine = create_async_engine(
     poolclass=NullPool,
     connect_args={
         "statement_cache_size": 0,
-        "timeout": 6,          # fail connection after 6 s (default: no timeout)
-        "command_timeout": 20, # fail individual queries after 20 s
+        "timeout": 15,
+        "command_timeout": 30,
     },
 )
 
