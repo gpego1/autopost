@@ -6,35 +6,35 @@ type Status = PostStatus | JobStatus
 const statusConfig: Record<Status, { label: string; className: string }> = {
   draft: {
     label: 'Rascunho',
-    className: 'bg-slate-700 text-slate-300 border-slate-600',
+    className: 'bg-muted text-muted-foreground border-border',
   },
   scheduled: {
     label: 'Agendado',
-    className: 'bg-blue-900/60 text-blue-300 border-blue-700',
+    className: 'bg-primary/10 text-primary border-primary/30',
   },
   publishing: {
     label: 'Publicando',
-    className: 'bg-yellow-900/60 text-yellow-300 border-yellow-700',
+    className: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700/50',
   },
   done: {
     label: 'Publicado',
-    className: 'bg-green-900/60 text-green-300 border-green-700',
+    className: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700/50',
   },
   failed: {
     label: 'Falhou',
-    className: 'bg-red-900/60 text-red-300 border-red-700',
+    className: 'bg-destructive/10 text-destructive border-destructive/30',
   },
   pending: {
     label: 'Pendente',
-    className: 'bg-slate-700 text-slate-300 border-slate-600',
+    className: 'bg-muted text-muted-foreground border-border',
   },
   running: {
     label: 'Executando',
-    className: 'bg-yellow-900/60 text-yellow-300 border-yellow-700',
+    className: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700/50',
   },
   retrying: {
     label: 'Tentando novamente',
-    className: 'bg-orange-900/60 text-orange-300 border-orange-700',
+    className: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700/50',
   },
 }
 

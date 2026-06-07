@@ -21,9 +21,9 @@ const PlatformIcon = ({ platform }: { platform: Platform }) => {
 }
 
 const platformColors: Record<Platform, string> = {
-  facebook: 'text-blue-400',
-  instagram: 'text-pink-400',
-  linkedin: 'text-sky-400',
+  facebook: 'text-blue-500',
+  instagram: 'text-pink-500',
+  linkedin: 'text-sky-500',
 }
 
 interface PostCardProps {
@@ -61,17 +61,17 @@ export function PostCard({ post }: PostCardProps) {
 
   return (
     <div
-      className="bg-navy-800 border border-navy-600 rounded-xl p-4 hover:border-primary-500 transition-colors cursor-pointer group"
+      className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer group"
       onClick={() => navigate(`/composer/${post.id}`)}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {post.title && (
-            <h3 className="text-white font-semibold text-sm truncate mb-1">
+            <h3 className="text-card-foreground font-semibold text-sm truncate mb-1">
               {post.title}
             </h3>
           )}
-          <p className="text-slate-400 text-sm leading-relaxed line-clamp-2">
+          <p className="text-muted-foreground text-sm leading-relaxed line-clamp-2">
             {contentPreview}
           </p>
         </div>
@@ -84,7 +84,7 @@ export function PostCard({ post }: PostCardProps) {
           {post.platforms.map((platform) => (
             <span
               key={platform}
-              className={platformColors[platform as Platform] ?? 'text-slate-400'}
+              className={platformColors[platform as Platform] ?? 'text-muted-foreground'}
               title={platform}
             >
               <PlatformIcon platform={platform as Platform} />
@@ -94,7 +94,7 @@ export function PostCard({ post }: PostCardProps) {
 
         {/* Scheduled time */}
         {post.scheduled_at && (
-          <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+          <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
             <Calendar className="w-3.5 h-3.5" />
             <span>
               {format(
@@ -107,13 +107,13 @@ export function PostCard({ post }: PostCardProps) {
         )}
       </div>
 
-      {/* Actions — visible on hover */}
-      <div className="mt-3 pt-3 border-t border-navy-600 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Actions — always visible on mobile, hover on desktop */}
+      <div className="mt-3 pt-3 border-t border-border flex items-center justify-end gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         {(post.status === 'scheduled' || post.status === 'failed') && (
           <button
             onClick={handlePublishNow}
             disabled={publishNow.isPending}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-green-400 hover:text-green-300 hover:bg-green-900/30 rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-900/30 rounded-lg transition-colors disabled:opacity-50"
           >
             {publishNow.isPending ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -125,7 +125,7 @@ export function PostCard({ post }: PostCardProps) {
         )}
         <button
           onClick={handleEdit}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-navy-600 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
         >
           <Edit2 className="w-3.5 h-3.5" />
           Editar
@@ -133,7 +133,7 @@ export function PostCard({ post }: PostCardProps) {
         <button
           onClick={handleDelete}
           disabled={deletePost.isPending}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
         >
           <Trash2 className="w-3.5 h-3.5" />
           Excluir

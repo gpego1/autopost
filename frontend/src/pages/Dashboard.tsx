@@ -16,70 +16,71 @@ export function Dashboard() {
   const recentPosts = posts.slice(0, 5)
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between mb-6 sm:mb-8">
         <div className="flex items-center gap-3">
-          <LayoutDashboard className="w-6 h-6 text-primary-400" />
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+          <LayoutDashboard className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Dashboard</h1>
         </div>
         <Link
           to="/composer"
-          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
+          className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <PenSquare className="w-4 h-4" />
-          Novo Post
+          <span className="hidden sm:inline">Novo Post</span>
+          <span className="sm:hidden">Novo</span>
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <StatCard
           label="Total de Posts"
           value={counts.total}
           icon={<PenSquare className="w-5 h-5" />}
-          color="text-slate-300"
+          colorClass="text-muted-foreground"
         />
         <StatCard
           label="Agendados"
           value={counts.scheduled}
           icon={<Calendar className="w-5 h-5" />}
-          color="text-blue-400"
+          colorClass="text-primary"
         />
         <StatCard
           label="Publicados"
           value={counts.done}
           icon={<CheckCircle2 className="w-5 h-5" />}
-          color="text-green-400"
+          colorClass="text-emerald-600 dark:text-emerald-400"
         />
         <StatCard
           label="Falharam"
           value={counts.failed}
           icon={<XCircle className="w-5 h-5" />}
-          color="text-red-400"
+          colorClass="text-destructive"
         />
       </div>
 
       <div>
-        <h2 className="text-white font-semibold mb-4">Posts Recentes</h2>
+        <h2 className="text-foreground font-semibold mb-4 text-sm sm:text-base">Posts Recentes</h2>
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 bg-navy-800 border border-navy-600 rounded-xl animate-pulse" />
+              <div key={i} className="h-24 bg-card border border-border rounded-lg animate-pulse" />
             ))}
           </div>
         ) : recentPosts.length === 0 ? (
-          <div className="text-center py-16 bg-navy-800 border border-navy-600 rounded-xl">
-            <Clock className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-            <p className="text-slate-400 mb-4">Nenhum post ainda.</p>
+          <div className="text-center py-12 sm:py-16 bg-card border border-border rounded-lg">
+            <Clock className="w-10 h-10 sm:w-12 sm:h-12 text-muted mx-auto mb-4" />
+            <p className="text-muted-foreground mb-4">Nenhum post ainda.</p>
             <Link
               to="/composer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
             >
               <PenSquare className="w-4 h-4" />
               Criar primeiro post
             </Link>
           </div>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-3 sm:gap-4">
             {recentPosts.map(post => (
               <PostCard key={post.id} post={post} />
             ))}
@@ -94,18 +95,18 @@ function StatCard({
   label,
   value,
   icon,
-  color,
+  colorClass,
 }: {
   label: string
   value: number
   icon: React.ReactNode
-  color: string
+  colorClass: string
 }) {
   return (
-    <div className="bg-navy-800 border border-navy-600 rounded-xl p-5">
-      <div className={`${color} mb-3`}>{icon}</div>
-      <div className="text-3xl font-bold text-white mb-1">{value}</div>
-      <div className="text-slate-400 text-sm">{label}</div>
+    <div className="bg-card border border-border rounded-lg p-4 sm:p-5 shadow-sm">
+      <div className={`${colorClass} mb-3`}>{icon}</div>
+      <div className="text-2xl sm:text-3xl font-bold text-card-foreground mb-1">{value}</div>
+      <div className="text-muted-foreground text-xs sm:text-sm">{label}</div>
     </div>
   )
 }

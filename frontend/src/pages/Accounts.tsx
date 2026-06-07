@@ -95,14 +95,14 @@ export function Accounts() {
   const metaAccounts = [...facebookAccounts, ...instagramAccounts]
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 mb-8">
-        <Link2 className="w-6 h-6 text-primary-400" />
-        <h1 className="text-2xl font-bold text-white">Contas Conectadas</h1>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
+      <div className="flex items-center gap-3 mb-6 sm:mb-8">
+        <Link2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground">Contas Conectadas</h1>
       </div>
 
       {callbackLoading && (
-        <div className="mb-6 flex items-center gap-3 bg-navy-800 border border-navy-600 rounded-lg p-4 text-slate-300 text-sm">
+        <div className="mb-6 flex items-center gap-3 bg-card border border-border rounded-lg p-4 text-muted-foreground text-sm">
           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
           Conectando conta...
         </div>
@@ -112,8 +112,8 @@ export function Accounts() {
         <div
           className={`mb-6 flex items-center gap-3 rounded-lg p-4 text-sm ${
             callbackStatus.type === 'success'
-              ? 'bg-green-900/30 border border-green-700 text-green-300'
-              : 'bg-red-900/30 border border-red-700 text-red-300'
+              ? 'bg-emerald-100 border border-emerald-200 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-700/50 dark:text-emerald-300'
+              : 'bg-destructive/10 border border-destructive/30 text-destructive'
           }`}
         >
           {callbackStatus.type === 'success' ? (
@@ -128,14 +128,14 @@ export function Accounts() {
       {isLoading ? (
         <div className="space-y-4">
           {[1, 2].map(i => (
-            <div key={i} className="h-28 bg-navy-800 border border-navy-600 rounded-xl animate-pulse" />
+            <div key={i} className="h-28 bg-card border border-border rounded-lg animate-pulse" />
           ))}
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5 sm:space-y-6">
           <PlatformSection
             title="Meta (Facebook & Instagram)"
-            icon={<Facebook className="w-5 h-5 text-blue-400" />}
+            icon={<Facebook className="w-5 h-5 text-blue-500" />}
             accounts={metaAccounts}
             onConnect={handleConnectMeta}
             onDisconnect={id => disconnect.mutate(id)}
@@ -144,7 +144,7 @@ export function Accounts() {
 
           <PlatformSection
             title="LinkedIn"
-            icon={<Linkedin className="w-5 h-5 text-sky-400" />}
+            icon={<Linkedin className="w-5 h-5 text-sky-500" />}
             accounts={linkedinAccounts}
             onConnect={handleConnectLinkedIn}
             onDisconnect={id => disconnect.mutate(id)}
@@ -157,9 +157,9 @@ export function Accounts() {
 }
 
 function PlatformIcon({ platform }: { platform: string }) {
-  if (platform === 'facebook') return <Facebook className="w-4 h-4 text-blue-400" />
-  if (platform === 'instagram') return <Instagram className="w-4 h-4 text-pink-400" />
-  return <Linkedin className="w-4 h-4 text-sky-400" />
+  if (platform === 'facebook') return <Facebook className="w-4 h-4 text-blue-500" />
+  if (platform === 'instagram') return <Instagram className="w-4 h-4 text-pink-500" />
+  return <Linkedin className="w-4 h-4 text-sky-500" />
 }
 
 function PlatformSection({
@@ -178,16 +178,16 @@ function PlatformSection({
   loading: boolean
 }) {
   return (
-    <div className="bg-navy-800 border border-navy-600 rounded-xl p-5">
+    <div className="bg-card border border-border rounded-lg p-4 sm:p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           {icon}
-          <h2 className="text-white font-semibold text-sm">{title}</h2>
+          <h2 className="text-card-foreground font-semibold text-sm">{title}</h2>
         </div>
         <button
           onClick={onConnect}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-700 hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
         >
           {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
           Conectar
@@ -195,24 +195,24 @@ function PlatformSection({
       </div>
 
       {accounts.length === 0 ? (
-        <p className="text-slate-500 text-sm">Nenhuma conta conectada.</p>
+        <p className="text-muted-foreground text-sm">Nenhuma conta conectada.</p>
       ) : (
         <div className="space-y-2">
           {accounts.map(acc => (
             <div
               key={acc.id}
-              className="flex items-center justify-between bg-navy-700 rounded-lg px-3 py-2.5"
+              className="flex items-center justify-between bg-muted/50 rounded-lg px-3 py-2.5"
             >
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <PlatformIcon platform={acc.platform} />
-                <div>
-                  <p className="text-white text-sm font-medium">{acc.account_name}</p>
-                  <p className="text-slate-500 text-xs capitalize">{acc.platform}</p>
+                <div className="min-w-0">
+                  <p className="text-foreground text-sm font-medium truncate">{acc.account_name}</p>
+                  <p className="text-muted-foreground text-xs capitalize">{acc.platform}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-2">
                 <span
-                  className={`text-xs font-medium ${acc.is_active ? 'text-green-400' : 'text-red-400'}`}
+                  className={`text-xs font-medium ${acc.is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}
                 >
                   {acc.is_active ? 'Ativo' : 'Inativo'}
                 </span>
@@ -220,7 +220,7 @@ function PlatformSection({
                   onClick={() => onDisconnect(acc.id)}
                   disabled={loading}
                   title="Desconectar"
-                  className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                  className="text-destructive hover:text-destructive p-1.5 rounded hover:bg-destructive/10 transition-colors disabled:opacity-50"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

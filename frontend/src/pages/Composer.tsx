@@ -94,47 +94,47 @@ export function Composer() {
   const isPending = createPost.isPending || updatePost.isPending || schedulePost.isPending
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 mb-8">
-        <PenSquare className="w-6 h-6 text-primary-400" />
-        <h1 className="text-2xl font-bold text-white">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
+      <div className="flex items-center gap-3 mb-6 sm:mb-8">
+        <PenSquare className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground">
           {isEdit ? 'Editar Post' : 'Novo Post'}
         </h1>
       </div>
 
       <div className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">
-            Título <span className="text-slate-500">(opcional)</span>
+          <label className="block text-sm font-medium text-foreground mb-1.5">
+            Título <span className="text-muted-foreground">(opcional)</span>
           </label>
           <input
             type="text"
             value={title}
             onChange={e => setTitle(e.target.value)}
             placeholder="Título do post..."
-            className="w-full bg-navy-800 border border-navy-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-primary-500 text-sm"
+            className="w-full bg-input border border-border rounded-lg px-4 py-2.5 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors text-sm"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">
-            Conteúdo <span className="text-red-400">*</span>
+          <label className="block text-sm font-medium text-foreground mb-1.5">
+            Conteúdo <span className="text-destructive">*</span>
           </label>
           <textarea
             value={content}
             onChange={e => setContent(e.target.value)}
             placeholder="Escreva o conteúdo do post..."
             rows={6}
-            className="w-full bg-navy-800 border border-navy-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary-500 text-sm resize-none"
+            className="w-full bg-input border border-border rounded-lg px-4 py-3 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors text-sm resize-none"
           />
-          <p className="text-slate-500 text-xs mt-1 text-right">{content.length} caracteres</p>
+          <p className="text-muted-foreground text-xs mt-1 text-right">{content.length} caracteres</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">
-            Plataformas <span className="text-red-400">*</span>
+          <label className="block text-sm font-medium text-foreground mb-2">
+            Plataformas <span className="text-destructive">*</span>
           </label>
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-2 sm:gap-3 flex-wrap">
             {PLATFORMS.map(({ id: pid, label, Icon }) => {
               const isConnected = connectedPlatforms.has(pid)
               const isSelected = platforms.includes(pid)
@@ -145,27 +145,27 @@ export function Composer() {
                   onClick={() => isConnected && togglePlatform(pid)}
                   disabled={!isConnected}
                   title={!isConnected ? `Conecte sua conta ${label} primeiro` : undefined}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
                     !isConnected
-                      ? 'border-navy-600 bg-navy-800 text-slate-600 cursor-not-allowed'
+                      ? 'border-border bg-muted text-muted-foreground/50 cursor-not-allowed'
                       : isSelected
-                        ? 'border-primary-500 bg-primary-700/40 text-white'
-                        : 'border-navy-600 bg-navy-800 text-slate-400 hover:border-primary-500 hover:text-white'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-card text-muted-foreground hover:border-primary/60 hover:text-foreground'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
                   {label}
                   {!isConnected && (
-                    <span className="text-xs text-slate-600 ml-1">(não conectado)</span>
+                    <span className="text-xs text-muted-foreground/50 ml-1 hidden sm:inline">(não conectado)</span>
                   )}
                 </button>
               )
             })}
           </div>
           {accounts.length === 0 && (
-            <p className="text-slate-500 text-xs mt-2">
+            <p className="text-muted-foreground text-xs mt-2">
               Nenhuma conta conectada.{' '}
-              <a href="/accounts" className="text-primary-400 hover:underline">
+              <a href="/accounts" className="text-primary hover:underline">
                 Conectar contas
               </a>
             </p>
@@ -173,31 +173,31 @@ export function Composer() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+          <label className="block text-sm font-medium text-foreground mb-1.5">
             <Calendar className="w-4 h-4 inline-block mr-1 relative -top-px" />
             Data e hora de publicação{' '}
-            <span className="text-slate-500">(opcional — deixe vazio para salvar como rascunho)</span>
+            <span className="text-muted-foreground text-xs">(opcional — deixe vazio para rascunho)</span>
           </label>
           <input
             type="datetime-local"
             value={scheduledAt}
             onChange={e => setScheduledAt(e.target.value)}
             min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
-            className="w-full bg-navy-800 border border-navy-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-primary-500 text-sm [color-scheme:dark]"
+            className="w-full bg-input border border-border rounded-lg px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors text-sm"
           />
         </div>
 
         {error && (
-          <div className="bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-red-300 text-sm">
+          <div className="bg-destructive/10 border border-destructive/30 rounded-lg px-4 py-3 text-destructive text-sm">
             {error}
           </div>
         )}
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <button
             onClick={handleSaveDraft}
             disabled={isPending}
-            className="flex items-center gap-2 px-4 py-2.5 border border-navy-600 bg-navy-800 text-slate-300 hover:text-white hover:border-primary-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 border border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary/50 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >
             {isPending ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -209,7 +209,7 @@ export function Composer() {
           <button
             onClick={handleSchedule}
             disabled={isPending || !scheduledAt}
-            className="flex items-center gap-2 px-4 py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             {isPending ? (
               <Loader2 className="w-4 h-4 animate-spin" />

@@ -5,9 +5,13 @@ import {
   LayoutDashboard,
   Link2,
   LogOut,
+  Moon,
   PenSquare,
+  Sun,
+  X,
   Zap,
 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -19,69 +23,116 @@ const navItems = [
   { to: '/history', icon: Clock, label: 'Histórico' },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean
+  onClose: () => void
+}
+
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const [dark, setDark] = useState(() =>
+    document.documentElement.classList.contains('dark')
+  )
 
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
   }
 
+  const toggleDark = () => {
+    const next = !dark
+    setDark(next)
+    document.documentElement.classList.toggle('dark', next)
+  }
+
+  // Close sidebar on navigation (mobile)
+  useEffect(() => {
+    onClose()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate])
+
   return (
-    <aside className="w-64 bg-navy-800 border-r border-navy-600 flex flex-col h-screen sticky top-0">
-      {/* Logo */}
-      <div className="p-6 border-b border-navy-600">
+    <aside
+      className={clsx(
+        'fixed inset-y-0 left-0 z-30 flex flex-col w-64 bg-sidebar border-r border-sidebar-border transition-transform duration-300 ease-in-out',
+        'lg:translate-x-0',
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      )}
+    >
+      {/* Logo + close button (mobile) */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-accent rounded-lg flex items-center justify-center">
-            <Zap className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
+            <Zap className="w-4 h-4 text-primary-foreground" />
           </div>
           <div>
-            <span className="text-white font-bold text-lg leading-none">AutoPost</span>
-            <p className="text-slate-500 text-xs mt-0.5">Social Scheduler</p>
+            <span className="text-foreground font-bold text-base leading-none">AutoPost</span>
+            <p className="text-muted-foreground text-xs mt-0.5">Social Scheduler</p>
           </div>
         </div>
+        <button
+          onClick={onClose}
+          aria-label="Fechar menu"
+          className="lg:hidden p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
+            onClick={onClose}
             className={({ isActive }) =>
               clsx(
-                'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-primary-700 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-navy-700'
+                  ? 'bg-primary/10 text-primary border border-primary/20'
+                  : 'text-sidebar-foreground hover:text-foreground hover:bg-muted/60'
               )
             }
           >
-            <Icon className="w-5 h-5 shrink-0" />
-            {label}
+            <Icon className="w-4 h-4 shrink-0" />
+            <span>{label}</span>
           </NavLink>
         ))}
       </nav>
 
-      {/* User footer */}
-      <div className="p-4 border-t border-navy-600">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-xs font-bold uppercase shrink-0">
+      {/* Footer */}
+      <div className="px-3 py-4 border-t border-sidebar-border space-y-1">
+        {/* Dark mode toggle */}
+        <button
+          onClick={toggleDark}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+          aria-label={dark ? 'Ativar modo claro' : 'Ativar modo escuro'}
+        >
+          {dark ? <Sun className="w-4 h-4 shrink-0" /> : <Moon className="w-4 h-4 shrink-0" />}
+          <span>{dark ? 'Modo claro' : 'Modo escuro'}</span>
+        </button>
+
+        {/* User info */}
+        <div className="flex items-center gap-3 px-3 py-2">
+          <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold uppercase shrink-0">
             {user?.email?.charAt(0) ?? 'U'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-medium truncate">
+            <p className="text-foreground text-xs font-medium truncate">
               {user?.user_metadata?.full_name ?? 'Usuário'}
             </p>
-            <p className="text-slate-500 text-xs truncate">{user?.email}</p>
+            <p className="text-muted-foreground text-xs truncate">{user?.email}</p>
           </div>
         </div>
+
+        {/* Sign out */}
         <button
           onClick={handleSignOut}
-          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="w-4 h-4 shrink-0" />
           Sair
         </button>
       </div>

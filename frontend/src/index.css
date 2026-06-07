@@ -1,3 +1,69 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --card: #ffffff;
+  --ring: #8a79ab;
+  --input: #eae7f0;
+  --muted: #dcd9e3;
+  --accent: #e6a5b8;
+  --border: #cec9d9;
+  --radius: 0.5rem;
+  --chart-1: #8a79ab;
+  --chart-2: #e6a5b8;
+  --chart-3: #77b8a1;
+  --chart-4: #f0c88d;
+  --chart-5: #a0bbe3;
+  --popover: #ffffff;
+  --primary: #8a79ab;
+  --sidebar: #f1eff5;
+  --secondary: #dfd9ec;
+  --background: #f8f7fa;
+  --foreground: #3d3c4f;
+  --destructive: #d95c5c;
+  --sidebar-border: #d7d2e0;
+  --card-foreground: #3d3c4f;
+  --sidebar-primary: #8a79ab;
+  --muted-foreground: #6b6880;
+  --accent-foreground: #4b2e36;
+  --popover-foreground: #3d3c4f;
+  --primary-foreground: #f8f7fa;
+  --sidebar-foreground: #3d3c4f;
+  --secondary-foreground: #3d3c4f;
+  --destructive-foreground: #f8f7fa;
+}
+
+.dark {
+  --card: #232030;
+  --ring: #a995c9;
+  --input: #2a273a;
+  --muted: #242031;
+  --accent: #372e3f;
+  --border: #302c40;
+  --popover: #232030;
+  --primary: #a995c9;
+  --sidebar: #16141e;
+  --secondary: #5a5370;
+  --background: #1a1823;
+  --foreground: #e0ddef;
+  --destructive: #e57373;
+  --sidebar-border: #2a273a;
+  --card-foreground: #e0ddef;
+  --sidebar-primary: #a995c9;
+  --muted-foreground: #a09aad;
+  --accent-foreground: #f2b8c6;
+  --popover-foreground: #e0ddef;
+  --primary-foreground: #1a1823;
+  --sidebar-foreground: #e0ddef;
+  --secondary-foreground: #e0ddef;
+  --destructive-foreground: #1a1823;
+}
+
+body {
+  font-family: 'Geist', sans-serif;
+  background-color: var(--background);
+  color: var(--foreground);
+}
